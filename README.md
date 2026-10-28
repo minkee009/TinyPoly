@@ -71,6 +71,30 @@ OBJ / glTF / GLB로 내보냅니다.
 | Ninja | 프리셋이 `Ninja Multi-Config` 사용 |
 | C 컴파일러 | C23 지원 (GCC 13+, Clang 17+) |
 | raylib 5.5 | 설치돼 있으면 사용, 없으면 CMake가 자동으로 받아서 빌드 |
+| Git | raylib을 자동으로 받을 때 필요 |
+
+<details>
+<summary><b>Windows</b>: MinGW-w64 (GCC)</summary>
+
+[Scoop](https://scoop.sh)으로 설치하는 방법 (PowerShell):
+
+```powershell
+scoop install git cmake ninja mingw
+```
+
+또는 winget:
+
+```powershell
+winget install Git.Git Kitware.CMake Ninja-build.Ninja BrechtSanders.WinLibs.POSIX.UCRT
+```
+
+설치 후 새 터미널에서 `gcc --version`이 13 이상인지 확인하고, 아래 [명령](#명령)을 그대로 실행하면 됩니다.
+실행 파일은 `build\Windows\bin\Release\TinyPoly.exe`에 생깁니다.
+
+VS Code에서는 `.vscode` 설정이 들어 있어서 **F5**로 바로 빌드 + 디버그 실행이 됩니다 (C/C++ 확장 필요).
+
+> MSVC(Visual Studio)는 아직 테스트하지 않았습니다. MinGW GCC로 빌드해 주세요.
+</details>
 
 <details>
 <summary><b>Linux</b>: raylib 빌드에 필요한 패키지</summary>
@@ -97,7 +121,7 @@ cmake --preset default
 cmake --build --preset release      # 또는 debug
 ```
 
-실행 파일은 `build/<OS>/bin/Release/TinyPoly` 에 생깁니다.
+실행 파일은 `build/<OS>/bin/Release/TinyPoly` 에 생깁니다 (`<OS>`는 `Windows`, `Darwin`, `Linux`).
 
 ---
 

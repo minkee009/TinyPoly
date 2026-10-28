@@ -512,7 +512,9 @@ int main(void) {
         if (h < 500) h = 500;
         if (w != GetScreenWidth() || h != GetScreenHeight()) {
             SetWindowSize(w, h);
-            SetWindowPosition((mw - w) / 2, (mh - h) / 2);
+            /* 보조 모니터에서도 그 모니터 가운데로 (모니터 위치를 더함) */
+            Vector2 mp = GetMonitorPosition(mon);
+            SetWindowPosition((int)mp.x + (mw - w) / 2, (int)mp.y + (mh - h) / 2);
         }
     }
     SetExitKey(KEY_NULL);
