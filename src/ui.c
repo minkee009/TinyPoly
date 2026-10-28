@@ -535,7 +535,7 @@ static const char *ICON_ART[UI_ICON_END - UI_ICON_FOLDER][10] = {
 static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
     const char *const *rows = ICON_ART[id - UI_ICON_FOLDER];
     const int s = UI_FONT_SCALE;
-    const Color accent = { 255, 200, 60, 255 };
+    const Color accent = { 255, 200, 60, c.a };   /* 흐린 버튼이면 강조색도 같이 흐리게 */
     int w = 0, h = 0;
     while (h < 10 && rows[h]) {
         int len = (int)strlen(rows[h]);
@@ -705,6 +705,26 @@ static void track_tip(mu_Context *ctx, mu_Id id, const char *tip) {
     }
     g_tip = tip;
     g_tip_seen = true;
+}
+
+void ui_tip(mu_Context *ctx, const char *tip) {
+    track_tip(ctx, ctx->last_id, tip);
+}
+
+static mu_Color g_saved[4];
+
+void ui_push_disabled(mu_Context *ctx) {
+    mu_Color *c = ctx->style->colors;
+    g_saved[0] = c[MU_COLOR_TEXT];
+    for (int i = 0; i < 3; i++) g_saved[1 + i] = c[MU_COLOR_BUTTON + i];
+    c[MU_COLOR_TEXT].a = 80;
+    c[MU_COLOR_BUTTONHOVER] = c[MU_COLOR_BUTTONFOCUS] = c[MU_COLOR_BUTTON];
+}
+
+void ui_pop_disabled(mu_Context *ctx) {
+    mu_Color *c = ctx->style->colors;
+    c[MU_COLOR_TEXT] = g_saved[0];
+    for (int i = 0; i < 3; i++) c[MU_COLOR_BUTTON + i] = g_saved[1 + i];
 }
 
 bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {

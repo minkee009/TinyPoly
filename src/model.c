@@ -152,7 +152,9 @@ static void open_context_menu(App *a, const Viewport *vp, Vector2 m) {
     a->menu_view = vp->kind;
     int vi = view_pick_vert(a, vp, m);
     int oi, fi;
-    if (o && vi >= 0 && a->mode == MODE_MODEL && (vp->kind != VIEW_3D || o->verts[vi].sel)) {
+    /* 3D 뷰는 직접 고른 정점일 때만 (면을 고르면 꼭짓점도 같이 골라지므로 면이 골라져 있으면 면 메뉴) */
+    bool vert_menu = vp->kind != VIEW_3D || (o && vi >= 0 && o->verts[vi].sel && count_sel_faces(o) == 0);
+    if (o && vi >= 0 && a->mode == MODE_MODEL && vert_menu) {
         if (!o->verts[vi].sel) {
             obj_clear_selection(o);
             o->verts[vi].sel = true;

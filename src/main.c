@@ -217,6 +217,14 @@ static void center_origin(App *a) {
     if (o->nverts) o->origin = Vector3Scale(Vector3Add(mn, mx), 0.5f);
 }
 
+/* 활성 메쉬에서 골라진 면(faces) 또는 정점 개수 */
+static int count_sel(const Object *o, bool faces) {
+    int n = 0;
+    if (faces) for (int i = 0; i < o->nfaces; i++) n += o->faces[i].sel;
+    else       for (int i = 0; i < o->nverts; i++) n += o->verts[i].sel;
+    return n;
+}
+
 static int g_menu_need;   /* 이번 프레임 메뉴 글자 중 가장 넓은 것 */
 
 /* 메뉴용 버튼: 글자 폭을 재 두고 그냥 버튼 */
@@ -240,15 +248,37 @@ static void menu_body(App *a, int width) {
         for (int i = 0; i < PRIM_COUNT; i++)
             if (menu_button(ctx, PRIM_NAMES[i])) { model_add_prim(a, i); close_popup(ctx); }
         break;
-    case MENU_VERTEX:
+    case MENU_VERTEX: {
+        int nv = o ? count_sel(o, false) : 0;
+        char title[48];
+        snprintf(title, sizeof title, "%d %s", nv, nv == 1 ? "vertex" : "vertices");
         mu_layout_row(ctx, 1, w1, 0);
-        if (menu_button(ctx, "merge"))        { model_merge(a); close_popup(ctx); }
+        mu_label(ctx, title);
+        /* 합치기는 정점 2개 이상일 때만 */
+        if (nv < 2) ui_push_disabled(ctx);
+        bool merge = menu_button(ctx, "merge");
+        if (nv < 2) {
+            ui_pop_disabled(ctx);
+            ui_tip(ctx, "select 2+ vertices to merge (box drag or shift+click)");
+        } else if (merge) {
+            model_merge(a);
+            close_popup(ctx);
+        }
         if (menu_button(ctx, "snap to grid")) { model_snap(a); close_popup(ctx); }
         if (menu_button(ctx, "delete (del)")) { model_delete_verts(a); close_popup(ctx); }
         break;
+    }
     case MENU_FACE:
-    case MENU_MESH:
+    case MENU_MESH: {
+        char title[64];
+        if (a->menu == MENU_FACE) {
+            int nf = o ? count_sel(o, true) : 0;
+            snprintf(title, sizeof title, "%d %s", nf, nf == 1 ? "face" : "faces");
+        } else {
+            snprintf(title, sizeof title, "mesh: %s", o ? o->name : "");
+        }
         mu_layout_row(ctx, 1, w1, 0);
+        mu_label(ctx, title);
         if (a->menu == MENU_FACE) {
             if (menu_button(ctx, "extrude (E)"))     { model_extrude(a); close_popup(ctx); }
             if (menu_button(ctx, "delete face (X)")) { model_delete_faces(a); close_popup(ctx); }
@@ -266,6 +296,7 @@ static void menu_body(App *a, int width) {
         if (menu_button(ctx, "copy (ctrl+c)"))         { model_copy(a); close_popup(ctx); }
         if (menu_button(ctx, "delete mesh (ctrl+x)"))  { model_delete_mesh(a); close_popup(ctx); }
         break;
+    }
     case MENU_FACEPROPS:
     case MENU_FACECOLOR:
     case MENU_FACEOPTS: {
@@ -407,16 +438,12 @@ static int g_bar_top;   /* 선택 막대의 위쪽 y (막대에서 연 팝업을
 static void draw_selection_bar(App *a) {
     mu_Context *ctx = a->ui;
     Object *o = app_active(a);
-    int nf = 0, nv = 0;
-    if (o) {
-        for (int i = 0; i < o->nfaces; i++) nf += o->faces[i].sel;
-        for (int i = 0; i < o->nverts; i++) nv += o->verts[i].sel;
-    }
+    int nf = o ? count_sel(o, true) : 0, nv = o ? count_sel(o, false) : 0;
     if (!nf && !nv) return;
 
     char label[32];
     if (nf) snprintf(label, sizeof label, "%d %s", nf, nf == 1 ? "face" : "faces");
-    else snprintf(label, sizeof label, "%d %s", nv, nv == 1 ? "vertex" : "verts");
+    else snprintf(label, sizeof label, "%d %s", nv, nv == 1 ? "vertex" : "vertices");
     const int B = 34, SEP = 9, L = ctx->text_width(NULL, label, -1) + 14;
     const int sp = ctx->style->spacing, pad = ctx->style->padding;
     int w = nf ? L + B * 4 + SEP + sp * 5 : L + B * 3 + sp * 3;
@@ -443,7 +470,10 @@ static void draw_selection_bar(App *a) {
     } else {
         mu_layout_row(ctx, 4, (int[]){ L, B, B, B }, 22);
         mu_label(ctx, label);
-        if (ui_icon_button(ctx, UI_ICON_MERGE, "merge vertices", false)) model_merge(a);
+        if (nv < 2) ui_push_disabled(ctx);
+        bool merge = ui_icon_button(ctx, UI_ICON_MERGE, nv < 2 ? "merge: select 2+ vertices" : "merge vertices", false);
+        if (nv < 2) ui_pop_disabled(ctx);
+        else if (merge) model_merge(a);
         if (ui_icon_button(ctx, UI_ICON_SNAP, "snap to grid", false)) model_snap(a);
         if (ui_icon_button(ctx, UI_ICON_DEL_VERT, "delete vertex (del)", false)) model_delete_verts(a);
     }

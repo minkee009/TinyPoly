@@ -31,6 +31,11 @@ void ui_render(mu_Context *ctx);
 /* 아이콘 버튼: 잠시 올려두면 tip이 툴팁으로 뜸. active면 눌린 상태로 칠함.
    같은 아이콘을 같은 범위에서 여러 번 쓰면 mu_push_id로 구분할 것 */
 bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active);
+/* 사이에 만든 버튼을 흐리게 (눌러도 반응 없어 보이게). 클릭은 부르는 쪽에서 무시할 것 */
+void ui_push_disabled(mu_Context *ctx);
+void ui_pop_disabled(mu_Context *ctx);
+/* 방금 만든 컨트롤에 마우스를 올리면 tip을 툴팁으로 */
+void ui_tip(mu_Context *ctx, const char *tip);
 /* 색 칸이 들어간 버튼 (지금 색을 보여주고 누르면 고르기) */
 bool ui_swatch_button(mu_Context *ctx, Color c, const char *tip, bool active);
 /* 켜진 상태를 강조색으로 보여주는 글자 버튼 */
