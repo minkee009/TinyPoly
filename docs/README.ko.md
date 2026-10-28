@@ -109,8 +109,6 @@ winget install Git.Git Kitware.CMake Ninja-build.Ninja BrechtSanders.WinLibs.POS
 설치 후 새 터미널에서 `gcc --version`이 13 이상인지 확인하고, 아래 [명령](#명령)을 그대로 실행하면 됩니다.
 실행 파일은 `build\Windows\bin\Release\TinyPoly.exe`에 생깁니다.
 
-VS Code에서는 `.vscode` 설정이 들어 있어서 **F5**로 바로 빌드 + 디버그 실행이 됩니다 (C/C++ 확장 필요).
-
 > MSVC(Visual Studio)는 아직 테스트하지 않았습니다. MinGW GCC로 빌드해 주세요.
 </details>
 
@@ -119,7 +117,7 @@ VS Code에서는 `.vscode` 설정이 들어 있어서 **F5**로 바로 빌드 + 
 
 ```sh
 # Debian / Ubuntu
-sudo apt install build-essential cmake ninja-build \
+sudo apt install build-essential cmake ninja-build gdb \
     libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
 ```
 </details>
@@ -140,6 +138,10 @@ cmake --build --preset release      # 또는 debug
 ```
 
 실행 파일은 `build/<OS>/bin/Release/TinyPoly` 에 생깁니다 (`<OS>`는 `Windows`, `Darwin`, `Linux`).
+
+### VS Code
+`.vscode` 설정이 들어 있어서 **F5**로 빌드 + 디버그 실행이 됩니다. **실행 및 디버그**에서 OS에 맞는 항목을 고르세요.
+디버깅에는 Microsoft의 **C/C++ 확장**(`ms-vscode.cpptools`)이 필요합니다. 폴더를 열면 VS Code가 설치를 권합니다.
 
 ---
 

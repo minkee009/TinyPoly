@@ -117,7 +117,7 @@ The executable ends up in `build\Windows\bin\Release\TinyPoly.exe`.
 
 ```sh
 # Debian / Ubuntu
-sudo apt install build-essential cmake ninja-build \
+sudo apt install build-essential cmake ninja-build gdb \
     libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
 ```
 </details>
@@ -138,6 +138,10 @@ cmake --build --preset release      # or debug
 ```
 
 The executable ends up in `build/<OS>/bin/Release/TinyPoly` (`<OS>` is `Windows`, `Darwin` or `Linux`).
+
+### VS Code
+The included `.vscode` settings build and debug with **F5**. Pick the configuration for your OS in **Run and Debug**.
+Debugging needs Microsoft's **C/C++ extension** (`ms-vscode.cpptools`); VS Code suggests it when you open the folder.
 
 ---
 
