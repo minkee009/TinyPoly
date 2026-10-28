@@ -372,8 +372,11 @@ static void draw_topbar(App *a) {
 
 static void draw_overview(App *a) {
     mu_Context *ctx = a->ui;
-    if (!mu_begin_window_ex(ctx, "project (O)", mu_rect(GetScreenWidth() - 320, TOPBAR_H + 30, 300, 420), MU_OPT_NOCLOSE))
+    bool closed;
+    if (!ui_begin_window(ctx, "project (O)", mu_rect(GetScreenWidth() - 320, TOPBAR_H + 30, 300, 420), 0, &closed)) {
+        if (closed) a->show_overview = 0;
         return;
+    }
     Scene *s = &a->scene;
     static double last_click;
     static int last_idx = -1;
@@ -408,22 +411,22 @@ static void draw_overview(App *a) {
         }
         mu_pop_id(ctx);
     }
-    /* 선택한 메쉬 복제/삭제, 창 닫기 */
-    mu_layout_row(ctx, 4, (int[]){ 34, 34, -36, -1 }, 0);
+    /* 선택한 메쉬 복제/삭제 */
+    mu_layout_row(ctx, 3, (int[]){ 34, 34, -1 }, 0);
     if (ui_icon_button(ctx, UI_ICON_CLONE, "clone selected mesh", false)) model_clone(a);
     if (ui_icon_button(ctx, UI_ICON_TRASH, "delete selected mesh (ctrl+x)", false)) model_delete_mesh(a);
-    mu_label(ctx, "");
-    if (ui_icon_button(ctx, UI_ICON_CLOSE, "close (O)", false)) a->show_overview = 0;
-    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
     mu_label(ctx, "double-click: rename");
-    mu_end_window(ctx);
+    ui_end_window(ctx);
 }
 
 static void draw_color_window(App *a) {
     mu_Context *ctx = a->ui;
-    if (!mu_begin_window_ex(ctx, "color (P)", mu_rect(GetScreenWidth() / 2 - 112, TOPBAR_H + 40, 225, 372),
-                            MU_OPT_NOCLOSE | MU_OPT_NORESIZE))
+    bool closed;
+    if (!ui_begin_window(ctx, "color (P)", mu_rect(GetScreenWidth() / 2 - 112, TOPBAR_H + 40, 225, 372),
+                         MU_OPT_NORESIZE, &closed)) {
+        if (closed) a->show_color = 0;
         return;
+    }
     Scene *sc = &a->scene;
     Color *target = a->pick_target ? &a->color2 : &a->color;
 
@@ -440,10 +443,9 @@ static void draw_color_window(App *a) {
         init = true;
     }
 
-    mu_layout_row(ctx, 3, (int[]){ 84, 84, -1 }, 0);
+    mu_layout_row(ctx, 2, (int[]){ 101, -1 }, 0);
     if (ui_toggle_button(ctx, "color 1", a->pick_target == 0)) a->pick_target = 0;
     if (ui_toggle_button(ctx, "color 2", a->pick_target == 1)) a->pick_target = 1;
-    if (ui_icon_button(ctx, UI_ICON_CLOSE, "close (P)", false)) a->show_color = 0;
     target = a->pick_target ? &a->color2 : &a->color;
 
     if (ui_color_picker(ctx, &h, &s, &v, &al)) {
@@ -493,14 +495,17 @@ static void draw_color_window(App *a) {
         app_mark(a);
         sc->bg = (Color){ target->r, target->g, target->b, 255 };
     }
-    mu_end_window(ctx);
+    ui_end_window(ctx);
 }
 
 static void draw_export_window(App *a) {
     mu_Context *ctx = a->ui;
     int W = GetScreenWidth(), H = GetScreenHeight();
-    if (!mu_begin_window_ex(ctx, "export", mu_rect(W / 2 - 200, H / 2 - 170, 400, 340), MU_OPT_NOCLOSE | MU_OPT_NORESIZE))
+    bool closed;
+    if (!ui_begin_window(ctx, "export", mu_rect(W / 2 - 200, H / 2 - 145, 400, 290), MU_OPT_NORESIZE, &closed)) {
+        if (closed) a->show_export = 0;
         return;
+    }
     mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
     mu_label(ctx, "3d file");
     mu_layout_row(ctx, 3, (int[]){ 120, 120, -1 }, 0);
@@ -532,7 +537,7 @@ static void draw_export_window(App *a) {
     mu_layout_row(ctx, 2, (int[]){ 182, -1 }, 0);
     if (mu_button(ctx, "export...")) file_export(a);
     if (mu_button(ctx, "cancel")) a->show_export = 0;
-    mu_end_window(ctx);
+    ui_end_window(ctx);
 }
 
 static void build_ui(App *a) {
@@ -561,18 +566,14 @@ static void build_ui(App *a) {
     mu_end(ctx);
 }
 
-static void draw_status(const App *a) {
-    int y = GetScreenHeight() - STATUS_H;
-    DrawRectangle(0, y, GetScreenWidth(), STATUS_H, (Color){ 16, 14, 24, 255 });
-    const char *text;
-    if (GetTime() - a->msg_time < 3.0 && a->msg[0]) text = a->msg;
-    else if (a->mode == MODE_MODEL)
-        text = "drag: move  R/T+drag: rotate/scale  shift+drag: center  RMB: menu  space: fullscreen  "
-               "E extrude  X del face  F/G props  M render  L shade  O project  tab: texture";
-    else
-        text = "V uv  B pen  I pick  G fill  ctrl+click: pick  R/H: rotate/flip uv  T+drag: scale uv  "
-               "space/MMB: pan  1-4 zoom  X swap  P color  tab: model";
-    DrawTextEx(GetFontDefault(), text, (Vector2){ 8, (float)y + 2 }, 20, 2, (Color){ 220, 216, 230, 255 });
+/* 저장/오류 같은 알림: 왼쪽 아래에 잠깐 떴다 사라짐 */
+static void draw_toast(const App *a) {
+    if (!a->msg[0] || GetTime() - a->msg_time > 3.0) return;
+    Vector2 ts = MeasureTextEx(GetFontDefault(), a->msg, 20, 2);
+    Rectangle r = { 10, GetScreenHeight() - ts.y - 22, ts.x + 16, ts.y + 10 };
+    ui_fill_round((Rectangle){ r.x - 2, r.y - 2, r.width + 4, r.height + 4 }, (Color){ 255, 200, 60, 255 });
+    ui_fill_round(r, (Color){ 20, 18, 28, 255 });
+    DrawTextEx(GetFontDefault(), a->msg, (Vector2){ r.x + 8, r.y + 5 }, 20, 2, (Color){ 240, 236, 228, 255 });
 }
 
 static void global_keys(App *a) {
@@ -684,8 +685,8 @@ int main(void) {
         if (a->mode == MODE_TEXTURE) paint_draw(a);
         for (int i = 0; i < VIEW_COUNT; i++)
             if (a->views[i].rect.width > 0) view_draw(a, &a->views[i]);
-        draw_status(a);
         DrawRectangle(0, 0, GetScreenWidth(), TOPBAR_H, (Color){ 34, 32, 44, 255 });
+        draw_toast(a);
         ui_render(a->ui);
         ui_tooltip_draw();
         cursor_draw(a);

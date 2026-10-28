@@ -26,32 +26,86 @@ static Color to_color(mu_Color c) {
     return (Color){ c.r, c.g, c.b, c.a };
 }
 
-/* ---- 모서리를 2픽셀 깎은 사각형 (도트 느낌의 둥근 모서리) ---- */
+/* ---- 도트 둥근 모서리: 한 칸(UI_FONT_SCALE 픽셀)씩 계단으로 깎음 ----
+   rad 2: 첫 줄 2칸, 둘째 줄 1칸 안쪽. 사각형을 가로 띠 몇 개로 나눠 out에 담고 개수를 돌려줌 */
 
-static void mu_round_rect(mu_Context *ctx, mu_Rect r, mu_Color c, bool square_bottom) {
-    if (r.w < 6 || r.h < 6) { mu_draw_rect(ctx, r, c); return; }
-    mu_draw_rect(ctx, mu_rect(r.x + 2, r.y, r.w - 4, r.h), c);
-    mu_draw_rect(ctx, mu_rect(r.x, r.y + 2, r.w, r.h - 4), c);
-    mu_draw_rect(ctx, mu_rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), c);
-    if (square_bottom) mu_draw_rect(ctx, mu_rect(r.x, r.y + r.h - 2, r.w, 2), c);
+#define PX UI_FONT_SCALE
+
+static int round_bands(int x, int y, int w, int h, int rad, bool square_bottom, int out[][4]) {
+    while (rad > 0 && (w < rad * PX * 3 || h < rad * PX * 3)) rad--;
+    int n = 0, top = rad * PX, bot = square_bottom ? 0 : rad * PX;
+    for (int i = 0; i < rad; i++) {
+        int in = (rad - i) * PX;
+        out[n][0] = x + in; out[n][1] = y + i * PX; out[n][2] = w - in * 2; out[n][3] = PX; n++;
+        if (!square_bottom) {
+            out[n][0] = x + in; out[n][1] = y + h - (i + 1) * PX; out[n][2] = w - in * 2; out[n][3] = PX; n++;
+        }
+    }
+    out[n][0] = x; out[n][1] = y + top; out[n][2] = w; out[n][3] = h - top - bot; n++;
+    return n;
 }
 
-/* microui의 기본 테두리/배경 대신. 창 제목줄은 아래쪽 모서리를 깎지 않음 (창 몸통과 이어지도록) */
+static void mu_round_rect(mu_Context *ctx, mu_Rect r, mu_Color c, int rad, bool square_bottom) {
+    int b[8][4], n = round_bands(r.x, r.y, r.w, r.h, rad, square_bottom, b);
+    for (int i = 0; i < n; i++) mu_draw_rect(ctx, mu_rect(b[i][0], b[i][1], b[i][2], b[i][3]), c);
+}
+
+static void fill_round(Rectangle r, Color c, int rad) {
+    int b[8][4], n = round_bands((int)r.x, (int)r.y, (int)r.width, (int)r.height, rad, false, b);
+    for (int i = 0; i < n; i++) DrawRectangle(b[i][0], b[i][1], b[i][2], b[i][3], c);
+}
+
+/* microui의 기본 테두리/배경 대신. 테두리는 한 칸 두께의 도트 원호 (바깥 rad 2, 안쪽 rad 1).
+   창 제목줄은 아래쪽 모서리를 깎지 않음 (창 몸통과 이어지도록) */
 static void draw_frame(mu_Context *ctx, mu_Rect rect, int colorid) {
     bool title = colorid == MU_COLOR_TITLEBG;
     bool bordered = !title && colorid != MU_COLOR_SCROLLBASE && colorid != MU_COLOR_SCROLLTHUMB;
     mu_Color border = ctx->style->colors[MU_COLOR_BORDER];
-    if (bordered && border.a)
-        mu_round_rect(ctx, mu_rect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2), border, false);
-    mu_round_rect(ctx, rect, ctx->style->colors[colorid], title);
+    if (bordered && border.a) {
+        mu_Rect o = mu_rect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
+        mu_round_rect(ctx, o, border, 2, false);
+        mu_round_rect(ctx, mu_rect(o.x + PX, o.y + PX, o.w - PX * 2, o.h - PX * 2), ctx->style->colors[colorid], 1, false);
+        return;
+    }
+    mu_round_rect(ctx, rect, ctx->style->colors[colorid], 2, title);
 }
 
 void ui_fill_round(Rectangle r, Color c) {
-    int x = (int)r.x, y = (int)r.y, w = (int)r.width, h = (int)r.height;
-    if (w < 6 || h < 6) { DrawRectangle(x, y, w, h, c); return; }
-    DrawRectangle(x + 2, y, w - 4, h, c);
-    DrawRectangle(x, y + 2, w, h - 4, c);
-    DrawRectangle(x + 1, y + 1, w - 2, h - 2, c);
+    fill_round(r, c, 2);
+}
+
+/* ---- 제목줄 닫기(X)와 크기 조절 손잡이가 있는 창 ---- */
+
+static bool g_resizable;   /* 창은 겹쳐 열지 않으므로 하나면 충분 */
+
+bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, bool *closed) {
+    *closed = false;
+    mu_Container *cnt = mu_get_container(ctx, title);
+    if (!cnt->open) {        /* 지난 프레임에 X를 누름: 다음에 다시 열 수 있게 되돌려 둠 */
+        cnt->open = 1;
+        *closed = true;
+        return false;
+    }
+    g_resizable = !(opt & MU_OPT_NORESIZE);
+    return mu_begin_window_ex(ctx, title, rect, opt) != 0;
+}
+
+void ui_end_window(mu_Context *ctx) {
+    if (g_resizable) {
+        /* 몸통 clip을 잠시 빼고 오른쪽 아래 모서리에 흐린 점 삼각형 (스크롤바 위에 그려지도록 맨 끝에) */
+        mu_pop_clip_rect(ctx);
+        mu_Rect r = mu_get_current_container(ctx)->rect;
+        mu_Color c = ctx->style->colors[MU_COLOR_TEXT];
+        c.a = 70;
+        static const char *art[5] = { "....X", ".....", "..X.X", ".....", "X.X.X" };
+        int x0 = r.x + r.w - 5 * PX - 4, y0 = r.y + r.h - 5 * PX - 4;
+        for (int j = 0; j < 5; j++)
+            for (int i = 0; i < 5; i++)
+                if (art[j][i] == 'X') mu_draw_rect(ctx, mu_rect(x0 + i * PX, y0 + j * PX, PX, PX), c);
+        mu_push_clip_rect(ctx, mu_get_clip_rect(ctx));
+    }
+    g_resizable = false;
+    mu_end_window(ctx);
 }
 
 void ui_init(mu_Context *ctx) {
@@ -329,9 +383,10 @@ static void draw_icon(int id, mu_Rect rect, mu_Color mc) {
 
     /* DrawTriangle은 화면 기준 반시계 방향으로 꼭짓점을 넘겨야 그려짐 */
     switch (id) {
-    case MU_ICON_CLOSE:
-        DrawLineEx((Vector2){ cx - h, cy - h }, (Vector2){ cx + h, cy + h }, 2.0f, c);
-        DrawLineEx((Vector2){ cx + h, cy - h }, (Vector2){ cx - h, cy + h }, 2.0f, c);
+    case MU_ICON_CLOSE:   /* 창 제목줄의 X: 도트 아이콘, 올려두면 강조색 */
+        if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){ rect.x, rect.y, rect.w, rect.h }))
+            c = (Color){ 255, 200, 60, 255 };
+        draw_pixel_icon(UI_ICON_CLOSE, rect, c);
         break;
     case MU_ICON_CHECK:
         DrawRectangle((int)(cx - h), (int)(cy - h), (int)(h * 2), (int)(h * 2), c);
@@ -480,8 +535,8 @@ void ui_tooltip_draw(void) {
     /* 화면 밖으로 나가지 않게 */
     if (x + w > GetScreenWidth()) x = GetScreenWidth() - w - 2;
     if (y + h > GetScreenHeight()) y = m.y - h - 6;
-    ui_fill_round((Rectangle){ x - 1, y - 1, w + 2, h + 2 }, (Color){ 255, 200, 60, 255 });
-    ui_fill_round((Rectangle){ x, y, w, h }, (Color){ 20, 18, 28, 255 });
+    fill_round((Rectangle){ x - PX, y - PX, w + PX * 2, h + PX * 2 }, (Color){ 255, 200, 60, 255 }, 2);
+    fill_round((Rectangle){ x, y, w, h }, (Color){ 20, 18, 28, 255 }, 1);
     DrawTextEx(f, g_tip, (Vector2){ x + 6, y + 4 }, font_size(), (float)UI_FONT_SCALE, (Color){ 240, 236, 228, 255 });
 }
 

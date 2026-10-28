@@ -1,4 +1,5 @@
 #include "filebrowser.h"
+#include "ui.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -177,7 +178,11 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
 
     int W = GetScreenWidth(), H = GetScreenHeight();
     mu_Rect r = mu_rect(W / 2 - 320, H / 2 - 250, 640, 500);
-    if (!mu_begin_window_ex(ctx, "files", r, MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) return false;
+    bool closed;
+    if (!ui_begin_window(ctx, "files", r, MU_OPT_NORESIZE, &closed)) {
+        if (closed) fb_close(fb);
+        return false;
+    }
     mu_bring_to_front(ctx, mu_get_current_container(ctx));
     bool done = false;
 
@@ -256,6 +261,6 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
             if (mu_button(ctx, "cancel")) fb_close(fb);
         }
     }
-    mu_end_window(ctx);
+    ui_end_window(ctx);
     return done;
 }

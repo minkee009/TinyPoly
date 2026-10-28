@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(TinyPoly
-    VERSION 0.4.6
+    VERSION 0.5.0
     LANGUAGES C
 )
 

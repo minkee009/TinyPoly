@@ -100,7 +100,7 @@ static void set_rect(App *a, Viewport *vp, Rectangle r) {
 
 void view_layout(App *a) {
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
-    Rectangle area = { 0, TOPBAR_H, W, H - TOPBAR_H - STATUS_H };
+    Rectangle area = { 0, TOPBAR_H, W, H - TOPBAR_H };
     for (int i = 0; i < VIEW_COUNT; i++) a->views[i].rect.width = 0;
 
     if (a->mode == MODE_TEXTURE) {

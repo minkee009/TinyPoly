@@ -33,8 +33,12 @@ bool ui_toggle_button(mu_Context *ctx, const char *label, bool active);
 void ui_tooltip_begin(void);
 void ui_tooltip_draw(void);
 
-/* 모서리를 2픽셀 깎은 사각형 (raylib로 바로 그림) */
+/* 모서리를 도트 계단으로 깎은 사각형 (raylib로 바로 그림) */
 void ui_fill_round(Rectangle r, Color c);
+/* 제목줄 오른쪽에 X가 있는 창 (MU_OPT_NOCLOSE 없이). X를 누르면 다음 프레임에 false + *closed = true.
+   크기 조절이 되는 창은 오른쪽 아래에 손잡이 점을 그림. 끝은 ui_end_window로 */
+bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, bool *closed);
+void ui_end_window(mu_Context *ctx);
 /* raylib로 바로 그리는 글자 버튼. blocked면 마우스를 무시 (UI 창이 위에 있을 때) */
 bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked);
 

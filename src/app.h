@@ -6,7 +6,6 @@
 #include "mesh.h"
 
 #define TOPBAR_H 30
-#define STATUS_H 24
 
 typedef enum { MODE_MODEL, MODE_TEXTURE } AppMode;
 
