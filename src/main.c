@@ -716,6 +716,7 @@ int main(void) {
         return 1;
     }
     SetWindowMinSize(800, 500);
+    app_set_icon();
     {
         /* 창이 화면보다 크면 macOS가 몰래 줄이는데 raylib은 이를 몰라서 위쪽이 잘린다.
            모니터에 맞는 크기로 직접 줄여 resize 콜백이 오게 한다 */

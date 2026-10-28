@@ -17,6 +17,12 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
 
 add_executable(TinyPoly ${SOURCES})
 
+# Windows: exe 파일 아이콘 (assets/icon.ico는 tools/make_icon.py로 만듦)
+if(WIN32)
+    enable_language(RC)
+    target_sources(TinyPoly PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assets/tinypoly.rc")
+endif()
+
 target_include_directories(TinyPoly PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )

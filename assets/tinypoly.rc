@@ -1,0 +1,2 @@
+// exe 아이콘. 경로는 이 파일 기준
+IDI_ICON1 ICON "icon.ico"

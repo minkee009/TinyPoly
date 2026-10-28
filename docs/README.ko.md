@@ -2,7 +2,9 @@
 
 [English](../README.md) | **한국어**
 
-# ◆ TinyPoly
+<img src="icon.png" width="96" alt="TinyPoly 아이콘">
+
+# TinyPoly
 
 **작고 가벼운 로우폴리 3D 모델러 + 도트 텍스처 페인터**
 

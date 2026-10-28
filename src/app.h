@@ -139,6 +139,9 @@ enum {
     CURSOR_MOVE, CURSOR_HAND, CURSOR_GRAB, CURSOR_ROTATE, CURSOR_SCALE, CURSOR_COUNT
 };
 void cursor_draw(App *a);
+
+/* icon.c: 창 아이콘 (도트 큐브) */
+void app_set_icon(void);
 int  model_cursor(App *a);              /* 뷰포트 위 상황에 맞는 커서 (model.c) */
 void uv_rotate(App *a);
 void uv_flip(App *a, bool vertical);
