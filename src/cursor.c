@@ -171,8 +171,21 @@ static void draw_art(const CursorArt *art, Vector2 m, Color dyn) {
             }
 }
 
+/* macOS는 커서 위에 창이 생기면 enter 이벤트를 안 보내서 IsCursorOnScreen()이 계속 false다.
+   첫 enter 전까지는 마우스가 움직인 뒤 창 안에 있는지로 대신 판단한다 */
+static bool cursor_visible(void) {
+    static bool entered, moved;
+    if (IsCursorOnScreen()) entered = true;
+    if (entered) return IsCursorOnScreen();
+    Vector2 d = GetMouseDelta();
+    if (d.x != 0 || d.y != 0) moved = true;
+    Vector2 m = GetMousePosition();
+    return moved && IsWindowFocused() &&
+           m.x >= 0 && m.y >= 0 && m.x < GetScreenWidth() && m.y < GetScreenHeight();
+}
+
 void cursor_draw(App *a) {
-    if (!IsCursorOnScreen()) return;
+    if (!cursor_visible()) return;
 
     int kind = CURSOR_ARROW;
     if (!a->ui_hover) {
