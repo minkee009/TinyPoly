@@ -16,10 +16,10 @@
                 "${workspaceFolder}/src",
                 "/usr/include"
             ],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "/usr/bin/gcc",
             "cStandard": "c23",
             "compileCommands": "${workspaceFolder}/build/Linux/compile_commands.json",
-            "intelliSenseMode": "linux-clang-x64"
+            "intelliSenseMode": "linux-gcc-x64"
         },
         {
             "name": "Mac",

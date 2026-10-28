@@ -109,8 +109,6 @@ winget install Git.Git Kitware.CMake Ninja-build.Ninja BrechtSanders.WinLibs.POS
 Open a new terminal, check that `gcc --version` is 13 or newer, and run the [commands](#commands) below.
 The executable ends up in `build\Windows\bin\Release\TinyPoly.exe`.
 
-In VS Code, the included `.vscode` settings let you build and debug with **F5** (needs the C/C++ extension).
-
 > MSVC (Visual Studio) has not been tested yet. Please build with MinGW GCC.
 </details>
 
