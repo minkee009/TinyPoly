@@ -722,19 +722,23 @@ void paint_update(App *a, bool input_ok) {
 static void draw_toolbar(App *a) {
     Rectangle c = a->canvas_rect;
     DrawRectangle((int)c.x, (int)c.y, (int)c.width, TOOLBAR_H, (Color){ 30, 28, 40, 255 });
-    static const char *labels[TOOL_COUNT] = { "uv", "pen", "pick", "fill", "line", "rect", "circ", "sel" };
-    float x = c.x + 4, y = c.y + 3, h = TOOLBAR_H - 6;
+    static const int icons[TOOL_COUNT] = { UI_ICON_UV, UI_ICON_PEN, UI_ICON_PICK, UI_ICON_FILL,
+                                           UI_ICON_LINE, UI_ICON_RECT, UI_ICON_CIRCLE, UI_ICON_SELECT };
+    static const char *tips[TOOL_COUNT] = { "uv edit (V)", "pen (B)", "pick color (I, ctrl+click)", "fill (G)",
+                                            "line", "rect (click again: filled)", "circle (click again: filled)",
+                                            "select area" };
+    float x = c.x + 4, y = c.y + 3, h = TOOLBAR_H - 6, B = 30;
     for (int i = 0; i < TOOL_COUNT; i++) {
-        const char *l = labels[i];
-        if (i == TOOL_RECT && a->rect_filled) l = "RECT";
-        if (i == TOOL_CIRCLE && a->circle_filled) l = "CIRC";
-        float w = MeasureTextEx(GetFontDefault(), l, 20, 2).x + 12;
-        if (ui_button_rect((Rectangle){ x, y, w, h }, l, a->tool == i, a->ui_hover)) set_tool(a, i);
-        x += w + 3;
+        int icon = icons[i];
+        if (i == TOOL_RECT && a->rect_filled) icon = UI_ICON_RECT_FILL;
+        if (i == TOOL_CIRCLE && a->circle_filled) icon = UI_ICON_CIRCLE_FILL;
+        if (ui_icon_button_rect((Rectangle){ x, y, B, h }, icon, tips[i], a->tool == i, a->ui_hover)) set_tool(a, i);
+        x += B + 3;
     }
     x += 10;
-    if (ui_button_rect((Rectangle){ x, y, 50, h }, "grid", a->tex_grid, a->ui_hover)) a->tex_grid = !a->tex_grid;
-    x += 60;
+    if (ui_icon_button_rect((Rectangle){ x, y, B, h }, UI_ICON_GRID, "pixel grid", a->tex_grid, a->ui_hover))
+        a->tex_grid = !a->tex_grid;
+    x += B + 10;
 
     /* 텍스처 크기 (누르면 크기 메뉴) */
     char size[24];
@@ -746,12 +750,15 @@ static void draw_toolbar(App *a) {
 
     Rectangle ar = area_rect(a);
     Vector2 center = { ar.x + ar.width / 2, ar.y + ar.height / 2 };
-    if (ui_button_rect((Rectangle){ x, y, 24, h }, "-", false, a->ui_hover)) zoom_step(a, -1, center);
-    x += 27;
-    if (ui_button_rect((Rectangle){ x, y, 24, h }, "+", false, a->ui_hover)) zoom_step(a, 1, center);
-    x += 27;
-    if (ui_button_rect((Rectangle){ x, y, 40, h }, "fit", a->tex_zoom == 0, a->ui_hover)) zoom_fit(a);
-    x += 46;
+    if (ui_icon_button_rect((Rectangle){ x, y, B, h }, UI_ICON_ZOOM_OUT, "zoom out", false, a->ui_hover))
+        zoom_step(a, -1, center);
+    x += B + 3;
+    if (ui_icon_button_rect((Rectangle){ x, y, B, h }, UI_ICON_ZOOM_IN, "zoom in", false, a->ui_hover))
+        zoom_step(a, 1, center);
+    x += B + 3;
+    if (ui_icon_button_rect((Rectangle){ x, y, B, h }, UI_ICON_FIT, "fit to window", a->tex_zoom == 0, a->ui_hover))
+        zoom_fit(a);
+    x += B + 6;
     char pct[16];
     snprintf(pct, sizeof pct, "%d%%", (int)lroundf(tex_scale(a) * 100));
     DrawTextEx(GetFontDefault(), pct, (Vector2){ x, y + 2 }, 20, 2, (Color){ 200, 196, 210, 255 });

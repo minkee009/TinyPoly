@@ -24,17 +24,20 @@ static const CursorArt ART[CURSOR_COUNT] = {
         "XX  XWX",
         "     XX",
     }, 0, 0 },
+    /* 상하좌우 팔 길이가 같은 십자 */
     [CURSOR_CROSS] = { {
         "    XWX",
         "    XWX",
         "    XWX",
+        "    XXX",
         "XXXX   XXXX",
-        "WWW  A  WWW",
+        "WWWX A XWWW",
         "XXXX   XXXX",
+        "    XXX",
         "    XWX",
         "    XWX",
         "    XWX",
-    }, 5, 4 },
+    }, 5, 5 },
     /* 연필: 지우개는 강조색, 심은 현재 색 */
     [CURSOR_PEN] = { {
         "        XXX",

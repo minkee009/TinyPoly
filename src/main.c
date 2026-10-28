@@ -331,6 +331,50 @@ static void menu_contents(App *a) {
     }
 }
 
+/* 상단바 줄에서 x 위치에 폭 w짜리 칸을 잡고 x를 넘김 */
+static void next_at(mu_Context *ctx, int *x, int w) {
+    mu_layout_set_next(ctx, mu_rect(*x, 0, w, 22), 1);
+    *x += w + ctx->style->spacing;
+}
+
+/* 선택한 것에 따라 쓸 수 있는 동작을 상단바에 보여줌 (우클릭 메뉴와 같은 동작, 키보드 없이도 쓸 수 있게).
+   면 > 정점 중 하나, 메쉬가 골라져 있으면 메쉬 동작도 */
+static void context_actions(App *a, int *x) {
+    mu_Context *ctx = a->ui;
+    Object *o = app_active(a);
+    if (!o) return;
+    int nf = 0, nv = 0;
+    for (int i = 0; i < o->nfaces; i++) nf += o->faces[i].sel;
+    for (int i = 0; i < o->nverts; i++) nv += o->verts[i].sel;
+    const int B = 34, GAP = 16;
+
+    if (nf) {
+        next_at(ctx, x, 54); mu_label(ctx, "face");
+        next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_EXTRUDE, "extrude (E)", false)) model_extrude(a);
+        next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_DEL_FACE, "delete face (X)", false)) model_delete_faces(a);
+        next_at(ctx, x, B);
+        if (ui_icon_button(ctx, UI_ICON_PROPS, "face props: color, sides... (F)", a->menu == MENU_FACEPROPS))
+            app_open_menu(a, MENU_FACEPROPS);
+        *x += GAP;
+    } else if (nv) {
+        next_at(ctx, x, 74); mu_label(ctx, "vertex");
+        next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_MERGE, "merge vertices", false)) model_merge(a);
+        next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_SNAP, "snap to grid", false)) model_snap(a);
+        next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_DEL_VERT, "delete vertex (del)", false)) model_delete_verts(a);
+        *x += GAP;
+    }
+    if (!app_active(a)) return;     /* 위 동작으로 메쉬가 사라졌을 수도 */
+    mu_push_id(ctx, "mesh", 4);     /* 면 속성 버튼과 같은 아이콘이라 구분 */
+    next_at(ctx, x, 54); mu_label(ctx, "mesh");
+    next_at(ctx, x, B);
+    if (ui_icon_button(ctx, UI_ICON_PROPS, "mesh props: name, hide, lock (G)", a->menu == MENU_MESHPROPS))
+        app_open_menu(a, MENU_MESHPROPS);
+    next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_CLONE, "clone mesh", false)) model_clone(a);
+    next_at(ctx, x, B); if (ui_icon_button(ctx, UI_ICON_TRASH, "delete mesh (ctrl+x)", false)) model_delete_mesh(a);
+    mu_pop_id(ctx);
+    *x += GAP;
+}
+
 static void draw_topbar(App *a) {
     mu_Context *ctx = a->ui;
     mu_Container *cnt = mu_get_container(ctx, "top");
@@ -339,10 +383,13 @@ static void draw_topbar(App *a) {
     if (!mu_begin_window_ex(ctx, "top", cnt->rect,
                             MU_OPT_NOTITLE | MU_OPT_NORESIZE | MU_OPT_NOCLOSE | MU_OPT_NOSCROLL | MU_OPT_NOFRAME))
         return;
-    /* [파일]  ·  [모델][텍스처]  ·  [추가][되돌리기][다시]  ·  [프로젝트][렌더][음영]  파일 이름
+    /* [파일]  ·  [모델][텍스처]  ·  [추가][되돌리기][다시]  ·  [프로젝트][렌더][음영]  ·  선택에 따른 동작  파일 이름
        빈 칸(label "")으로 묶음 사이를 띄운다 */
     const int B = 34, GAP = 22;
-    mu_layout_row(ctx, 14, (int[]){ B, GAP, B, B, GAP, B, B, B, GAP, B, B, B, 12, -1 }, 22);
+    static const int widths[13] = { B, GAP, B, B, GAP, B, B, B, GAP, B, B, B, 12 };
+    mu_layout_row(ctx, 13, widths, 22);
+    int x = 0;   /* 이 줄 다음 칸의 위치 (microui 한 줄은 16칸까지라 뒤쪽은 직접 자리를 잡음) */
+    for (int i = 0; i < 13; i++) x += widths[i] + ctx->style->spacing;
     if (ui_icon_button(ctx, UI_ICON_FOLDER, "file", a->menu == MENU_FILE)) app_open_menu(a, MENU_FILE);
     mu_label(ctx, "");
     if (ui_icon_button(ctx, UI_ICON_CUBE, "model mode (tab)", a->mode == MODE_MODEL)) a->mode = MODE_MODEL;
@@ -364,8 +411,10 @@ static void draw_topbar(App *a) {
     if (ui_icon_button(ctx, UI_ICON_SHADE, a->shading ? "shading: on (L)" : "shading: off (L)", a->shading))
         a->shading = !a->shading;
     mu_label(ctx, "");
+    if (a->mode == MODE_MODEL) context_actions(a, &x);
     char buf[300];
     snprintf(buf, sizeof buf, "%s%s", GetFileName(a->path), a->dirty ? " *" : "");   /* 전체 경로는 창 제목에 */
+    next_at(ctx, &x, GetScreenWidth() - x - 16);
     mu_label(ctx, buf);
     mu_end_window(ctx);
 }

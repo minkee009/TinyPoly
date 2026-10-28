@@ -14,6 +14,11 @@ enum {
     UI_ICON_RENDER_TEX, UI_ICON_RENDER_COLOR, UI_ICON_RENDER_WIRE, UI_ICON_SHADE,
     UI_ICON_EYE, UI_ICON_EYE_OFF, UI_ICON_LOCK, UI_ICON_UNLOCK,
     UI_ICON_CLONE, UI_ICON_TRASH, UI_ICON_CLOSE,
+    /* 선택에 따른 모델 동작 */
+    UI_ICON_EXTRUDE, UI_ICON_DEL_FACE, UI_ICON_PROPS, UI_ICON_MERGE, UI_ICON_SNAP, UI_ICON_DEL_VERT,
+    /* 텍스처 도구줄 */
+    UI_ICON_UV, UI_ICON_PEN, UI_ICON_PICK, UI_ICON_FILL, UI_ICON_LINE, UI_ICON_RECT, UI_ICON_RECT_FILL,
+    UI_ICON_CIRCLE, UI_ICON_CIRCLE_FILL, UI_ICON_SELECT, UI_ICON_GRID, UI_ICON_ZOOM_OUT, UI_ICON_ZOOM_IN, UI_ICON_FIT,
     UI_ICON_END,
     /* 아이콘 명령으로 그리는 그림 (색 선택 창) */
     UI_GFX_SV = UI_ICON_END, UI_GFX_HUE, UI_GFX_ALPHA, UI_GFX_SWATCH,
@@ -41,6 +46,8 @@ bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, 
 void ui_end_window(mu_Context *ctx);
 /* raylib로 바로 그리는 글자 버튼. blocked면 마우스를 무시 (UI 창이 위에 있을 때) */
 bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked);
+/* 같은 방식의 아이콘 버튼 (툴팁 포함) */
+bool ui_icon_button_rect(Rectangle r, int icon, const char *tip, bool active, bool blocked);
 
 /* 색 선택: 채도/명도 사각형 + 색상 막대 + 알파 막대. 바뀌면 true (h: 0~360, 나머지 0~1) */
 bool ui_color_picker(mu_Context *ctx, float *h, float *s, float *v, float *alpha);

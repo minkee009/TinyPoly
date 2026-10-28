@@ -313,6 +313,216 @@ static const char *ICON_ART[UI_ICON_END - UI_ICON_FOLDER][10] = {
         ".X...X.",
         "X.....X",
     },
+    [UI_ICON_EXTRUDE - UI_ICON_FOLDER] = {
+        "....A....",
+        "...AAA...",
+        "..A.A.A..",
+        "....A....",
+        "XXXXXXXXX",
+        "X.......X",
+        "X.......X",
+        "XXXXXXXXX",
+    },
+    [UI_ICON_DEL_FACE - UI_ICON_FOLDER] = {
+        "XXXXXXXXX",
+        "X.......X",
+        "X.A...A.X",
+        "X..A.A..X",
+        "X...A...X",
+        "X..A.A..X",
+        "X.A...A.X",
+        "X.......X",
+        "XXXXXXXXX",
+    },
+    /* 속성: 슬라이더 두 개 */
+    [UI_ICON_PROPS - UI_ICON_FOLDER] = {
+        "..AA.....",
+        "XXAAXXXXX",
+        "..AA.....",
+        ".........",
+        ".....AA..",
+        "XXXXXAAXX",
+        ".....AA..",
+    },
+    /* 정점 둘이 하나로 */
+    [UI_ICON_MERGE - UI_ICON_FOLDER] = {
+        "XX.....XX",
+        "XX.....XX",
+        "..X...X..",
+        "...X.X...",
+        "....X....",
+        "...AAA...",
+        "...AAA...",
+        "...AAA...",
+    },
+    /* 격자 위에 붙은 정점 */
+    [UI_ICON_SNAP - UI_ICON_FOLDER] = {
+        "X...X...X",
+        ".........",
+        ".........",
+        "...AAA...",
+        "X..AXA..X",
+        "...AAA...",
+        ".........",
+        ".........",
+        "X...X...X",
+    },
+    [UI_ICON_DEL_VERT - UI_ICON_FOLDER] = {
+        "......A.A",
+        ".......A.",
+        "......A.A",
+        ".........",
+        "..XXX....",
+        "..XXX....",
+        "..XXX....",
+    },
+    [UI_ICON_UV - UI_ICON_FOLDER] = {
+        "AA.....AA",
+        "AAXXXXXAA",
+        ".X.....X.",
+        ".X.....X.",
+        ".X.....X.",
+        ".X.....X.",
+        ".X.....X.",
+        "AAXXXXXAA",
+        "AA.....AA",
+    },
+    [UI_ICON_PEN - UI_ICON_FOLDER] = {
+        ".......X.",
+        "......XAX",
+        ".....X.X.",
+        "....X.X..",
+        "...X.X...",
+        "..X.X....",
+        ".XXX.....",
+        ".XX......",
+        "X........",
+    },
+    [UI_ICON_PICK - UI_ICON_FOLDER] = {
+        ".......XX",
+        "......XXX",
+        ".....XXX.",
+        "....X.X..",
+        "...X.X...",
+        "..X.X....",
+        ".AAX.....",
+        ".AA......",
+        "X........",
+    },
+    [UI_ICON_FILL - UI_ICON_FOLDER] = {
+        "...X.....",
+        "..X.X....",
+        ".X...X...",
+        "X.....X..",
+        ".X...XXA.",
+        "..X.X..AA",
+        "...X...AA",
+        ".......A.",
+    },
+    [UI_ICON_LINE - UI_ICON_FOLDER] = {
+        "........X",
+        ".......X.",
+        "......X..",
+        ".....X...",
+        "....X....",
+        "...X.....",
+        "..X......",
+        ".X.......",
+        "X........",
+    },
+    [UI_ICON_RECT - UI_ICON_FOLDER] = {
+        "XXXXXXXXX",
+        "X.......X",
+        "X.......X",
+        "X.......X",
+        "X.......X",
+        "X.......X",
+        "XXXXXXXXX",
+    },
+    [UI_ICON_RECT_FILL - UI_ICON_FOLDER] = {
+        "XXXXXXXXX",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        "XXXXXXXXX",
+    },
+    [UI_ICON_CIRCLE - UI_ICON_FOLDER] = {
+        "..XXXXX..",
+        ".X.....X.",
+        "X.......X",
+        "X.......X",
+        "X.......X",
+        ".X.....X.",
+        "..XXXXX..",
+    },
+    [UI_ICON_CIRCLE_FILL - UI_ICON_FOLDER] = {
+        "..XXXXX..",
+        ".XAAAAAX.",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        "XAAAAAAAX",
+        ".XAAAAAX.",
+        "..XXXXX..",
+    },
+    /* 점선 사각형 (영역 선택) */
+    [UI_ICON_SELECT - UI_ICON_FOLDER] = {
+        "XX.XXX.XX",
+        "X.......X",
+        ".........",
+        "X.......X",
+        "X.......X",
+        ".........",
+        "X.......X",
+        "XX.XXX.XX",
+    },
+    [UI_ICON_GRID - UI_ICON_FOLDER] = {
+        "XXXXXXXXXX",
+        "X..X..X..X",
+        "X..X..X..X",
+        "XXXXXXXXXX",
+        "X..X..X..X",
+        "X..X..X..X",
+        "XXXXXXXXXX",
+        "X..X..X..X",
+        "X..X..X..X",
+        "XXXXXXXXXX",
+    },
+    [UI_ICON_ZOOM_OUT - UI_ICON_FOLDER] = {
+        ".XXXXX...",
+        "X.....X..",
+        "X.....X..",
+        "X.AAA.X..",
+        "X.....X..",
+        "X.....X..",
+        ".XXXXXX..",
+        "......XX.",
+        ".......XX",
+    },
+    [UI_ICON_ZOOM_IN - UI_ICON_FOLDER] = {
+        ".XXXXX...",
+        "X.....X..",
+        "X..A..X..",
+        "X.AAA.X..",
+        "X..A..X..",
+        "X.....X..",
+        ".XXXXXX..",
+        "......XX.",
+        ".......XX",
+    },
+    /* 화면에 맞춤: 네 모서리 */
+    [UI_ICON_FIT - UI_ICON_FOLDER] = {
+        "XXX...XXX",
+        "X.......X",
+        "X.......X",
+        ".........",
+        ".........",
+        ".........",
+        "X.......X",
+        "X.......X",
+        "XXX...XXX",
+    },
 };
 
 static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
@@ -541,6 +751,25 @@ void ui_tooltip_draw(void) {
 }
 
 /* ---- raylib로 직접 그리는 버튼 (텍스처 모드 도구줄 등) ---- */
+
+bool ui_icon_button_rect(Rectangle r, int icon, const char *tip, bool active, bool blocked) {
+    Vector2 m = GetMousePosition();
+    bool hover = !blocked && CheckCollisionPointRec(m, r);
+    Color bg = active ? (Color){ 120, 104, 60, 255 } : hover ? (Color){ 84, 80, 108, 255 } : (Color){ 52, 50, 68, 255 };
+    ui_fill_round(r, bg);
+    draw_pixel_icon(icon, (mu_Rect){ (int)r.x, (int)r.y, (int)r.width, (int)r.height }, (Color){ 230, 230, 230, 255 });
+    if (tip && hover) {
+        /* microui id와 겹치지 않게 위치로 만든 id */
+        mu_Id id = 0x80000000u ^ ((mu_Id)r.x << 12) ^ (mu_Id)r.y;
+        if (g_tip_id != id) {
+            g_tip_id = id;
+            g_tip_since = GetTime();
+        }
+        g_tip = tip;
+        g_tip_seen = true;
+    }
+    return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
 
 bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked) {
     Vector2 m = GetMousePosition();
