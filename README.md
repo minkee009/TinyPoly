@@ -2,9 +2,7 @@
 
 **English** | [한국어](docs/README.ko.md)
 
-<img src="docs/icon.png" width="96" alt="TinyPoly icon">
-
-# TinyPoly
+<h1><img src="docs/icon.png" width="64" align="absmiddle" alt="TinyPoly icon"> TinyPoly</h1>
 
 **A tiny, lightweight low-poly 3D modeler + pixel texture painter**
 
