@@ -791,22 +791,50 @@ void paint_draw(App *a) {
     }
     DrawRectangleLinesEx((Rectangle){ tr.x - 1, tr.y - 1, tr.width + 2, tr.height + 2 }, 1, (Color){ 90, 86, 110, 255 });
 
-    /* UV: 활성 메쉬의 다른 면은 흐리게, 선택된 면은 진하게 + 꼭짓점 */
+    /* UV: 어떤 텍스처 위에서도 보이게 어두운 테두리 + 밝은 선 (테두리를 먼저 다 그려야 이음새가 안 덮임).
+       선택된 면은 영역을 옅게 칠하고 노란 선 + 꼭짓점 */
     Object *ob = app_active(a);
     if (ob) {
-        for (int pass = 0; pass < 2; pass++)
-            for (int i = 0; i < ob->nfaces; i++) {
-                const Face *f = &ob->faces[i];
-                if (f->sel != (pass == 1) || (f->flags & FACE_NOTEX)) continue;
-                Color c = pass ? (Color){ 255, 200, 60, 255 } : (Color){ 255, 255, 255, 90 };
-                for (int k = 0; k < f->n; k++)
-                    DrawLineEx(tex_to_screen(a, f->uv[k]), tex_to_screen(a, f->uv[(k + 1) % f->n]), pass ? 2.0f : 1.0f, c);
-                if (pass && a->tool == TOOL_UV)
+        const Color dark = { 16, 14, 24, 220 };
+        for (int pass = 0; pass < 2; pass++) {
+            Color c = pass ? (Color){ 255, 200, 60, 255 } : (Color){ 240, 236, 228, 230 };
+            float w = 2.0f;
+            for (int layer = 0; layer < 3; layer++)
+                for (int i = 0; i < ob->nfaces; i++) {
+                    const Face *f = &ob->faces[i];
+                    if (f->sel != (pass == 1) || (f->flags & FACE_NOTEX)) continue;
+                    if (layer == 0) {
+                        if (!pass) continue;
+                        /* 볼록 다각형 부채꼴. 감김 방향을 몰라서 양쪽 다 (뒷면은 걸러짐) */
+                        Vector2 p0 = tex_to_screen(a, f->uv[0]);
+                        for (int k = 1; k + 1 < f->n; k++) {
+                            Vector2 p1 = tex_to_screen(a, f->uv[k]), p2 = tex_to_screen(a, f->uv[k + 1]);
+                            DrawTriangle(p0, p1, p2, (Color){ 255, 200, 60, 50 });
+                            DrawTriangle(p0, p2, p1, (Color){ 255, 200, 60, 50 });
+                        }
+                        continue;
+                    }
+                    for (int k = 0; k < f->n; k++) {
+                        Vector2 p = tex_to_screen(a, f->uv[k]), q = tex_to_screen(a, f->uv[(k + 1) % f->n]);
+                        if (layer == 1) {
+                            DrawLineEx(p, q, w + 2, dark);
+                            DrawRectangleV((Vector2){ p.x - (w + 2) / 2, p.y - (w + 2) / 2 }, (Vector2){ w + 2, w + 2 }, dark);
+                        } else {
+                            DrawLineEx(p, q, w, c);
+                        }
+                    }
+                }
+            if (pass && a->tool == TOOL_UV)
+                for (int i = 0; i < ob->nfaces; i++) {
+                    const Face *f = &ob->faces[i];
+                    if (!f->sel || (f->flags & FACE_NOTEX)) continue;
                     for (int k = 0; k < f->n; k++) {
                         Vector2 p = tex_to_screen(a, f->uv[k]);
+                        DrawRectangle((int)p.x - 4, (int)p.y - 4, 8, 8, dark);
                         DrawRectangle((int)p.x - 3, (int)p.y - 3, 6, 6, c);
                     }
-            }
+                }
+        }
     }
 
     if (g_sw > 0) {

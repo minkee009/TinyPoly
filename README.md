@@ -9,7 +9,7 @@
 Build meshes by clicking and dragging in four views, paint textures up to 1024×1024 by hand,<br>
 and export to OBJ / glTF / GLB.
 
-![version](https://img.shields.io/badge/version-0.5.2-f8c040)
+![version](https://img.shields.io/badge/version-0.5.3-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
