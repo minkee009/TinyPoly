@@ -1,0 +1,38 @@
+/.DS_Store
+/bin
+/obj
+
+# CMake build directory
+/build/
+
+# Build outputs
+/bin/
+/obj/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+
+# Compiled binaries and objects
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Debug symbols
+*.pdb
+*.ilk
+*.dSYM/
+
+# IDE
+.vs/

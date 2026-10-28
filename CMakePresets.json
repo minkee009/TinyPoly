@@ -1,0 +1,16 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "TinyPoly",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build/${hostSystemName}"
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug",   "configurePreset": "default", "configuration": "Debug" },
+        { "name": "release", "configurePreset": "default", "configuration": "Release" }
+    ]
+}
