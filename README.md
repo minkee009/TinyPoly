@@ -1,113 +1,121 @@
 <div align="center">
 
+**English** | [한국어](docs/README.ko.md)
+
 # ◆ TinyPoly
 
-**작고 가벼운 로우폴리 3D 모델러 + 도트 텍스처 페인터**
+**A tiny, lightweight low-poly 3D modeler + pixel texture painter**
 
-4분할 뷰에서 클릭·드래그로 메쉬를 만들고, 최대 1024×1024 텍스처를 직접 그려서<br>
-OBJ / glTF / GLB로 내보냅니다.
+Build meshes by clicking and dragging in four views, paint textures up to 1024×1024 by hand,<br>
+and export to OBJ / glTF / GLB.
 
 ![version](https://img.shields.io/badge/version-0.5.2-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
 
-![모델링 모드](docs/model.png)
+![Model mode](docs/model.png)
 
 </div>
 
-> picoCAD 2의 작업 방식(4분할 뷰, 클릭 중심 조작, 별도 텍스처 모드)에서 영감을 받아 처음부터 새로 만든 프로젝트입니다.
-> picoCAD와는 관련이 없으며 코드나 에셋을 가져오지 않았습니다.
+---
+
+## ✦ Features
+
+### Modeling
+- **Four views**: top / 3d / front / side. `Space` toggles fullscreen for the view under the mouse
+- **7 primitives**: plane, cube, prism, pyramid, cylinder, cone, sphere. Right-click empty space to create one facing that view, or use the `+` button in the top bar
+- **Click & drag editing**: drag a mesh or vertex to move it, `R`+drag to rotate, `T`+drag to scale, hold `Shift` while dragging to move the origin, `Ctrl` inverts grid snapping
+- **Box select**: drag on empty space in the 2D views, `Ctrl`+drag in the 3D view (`Shift` adds to the selection)
+- **Editing**: extrude faces, delete faces/vertices, merge and snap vertices, mirror, clone, copy/paste meshes
+- **Selection bar**: select faces or vertices and a small bar appears at the bottom of the views, showing how many are selected and what you can do with them
+  - faces: extrude, delete │ face color, options
+  - vertices: merge, snap to grid, delete (merge is greyed out until 2+ vertices are selected)
+- **Right-click menus**: the menu depends on what is under the cursor (vertex / face / mesh / empty space) and its title tells you which one it is
+- **Face properties (`F`)**: color, double-sided, shading, textured, draw behind
+- **Project window (`O`)**: hide (eye), lock (padlock), rename (double-click), center origin, clone, delete
+- 3-step flat shading, transparent pixels, textured / color / wireframe render (`M`), shading toggle (`L`)
+
+### Texture
+![Texture mode](docs/texture.png)
+
+- **RGBA textures, 128 to 1024**: change the size with the size button in the toolbar (the top-left pixels are kept)
+- **Tools**: UV (`V`), pen (`B`), color picker (`I`), fill (`G`), line, rectangle, circle, area select. Click rectangle/circle again for the filled version
+- **UV editing**: drag, move corners, rotate (`R`), flip (`H`), scale (`T`+drag), nudge with arrow keys, copy/paste
+- **Area select**: move, copy/paste (`Ctrl+C/V`), delete (`Del`)
+- **Color window (`P`)**: saturation/value square, hue bar, alpha, hex input. Separate colors for left and right click (`X` swaps them)
+- **Palette**: up to 256 swatches. Add, overwrite, delete. The first swatch is transparent (eraser)
+- Zoom from 12.5% to 3200%, or fit to window (`1` fit, `2` 100%, `3` 200%, `4` 400%)
+- PNG import (up to 1024×1024, kept at its original size)
+
+### Files
+![File browser](docs/file-browser.png)
+
+- Built-in file browser: looks and works the same on every OS
+- Own format `.tpm` (text: meshes + UVs + texture (PNG) + palette). Older 16-color files from 0.4.x still open
+- Drag and drop `.tpm` / `.png` files onto the window to open them
+
+### Export
+![Export window](docs/export.png)
+
+File → **export...** opens the export window. Pick a 3D format and how to save it (folder / zip), and it shows exactly which files will be created.
+
+| Format | Files inside the folder or zip |
+|---|---|
+| OBJ + MTL | `name.obj` + `name.mtl` + `name.png` |
+| glTF | `name.gltf` + `name.bin` + `name.png` |
+| GLB | `name.glb` (texture included) |
+
+Colors of untextured faces are stored in a strip at the bottom of the texture PNG, so they look the same in any engine.
+
+### Interface
+- Pixel-art icons everywhere. Hover for a moment to see the name and shortcut as a tooltip
+- Pixel-rounded windows with a close button in the title bar, and a resize grip on resizable ones
+- Short notifications (saved, errors) pop up in the bottom-left corner and fade out
+
+### Pixel cursors
+![Cursors](docs/cursors.png)
+
+The cursor changes with what you are doing. The pencil tip and paint bucket show the current color, and the color picker's liquid shows the color under the cursor.
 
 ---
 
-## ✦ 기능
+## ✦ Build
 
-### 모델링
-- **4분할 뷰** — top / 3d / front / side. `Space`로 마우스 아래 뷰를 전체화면 전환
-- **기본 도형 7종** — plane, cube, prism, pyramid, cylinder, cone, sphere (빈 곳 우클릭 → 보고 있는 뷰를 향해 생성)
-- **클릭·드래그 편집** — 메쉬/정점 드래그로 이동, `R`+드래그 회전, `T`+드래그 크기, 드래그 중 `Shift`로 중심점 이동, `Ctrl`로 그리드 스냅 반전
-- **면 편집** — 돌출(`E`), 삭제(`X`), 미러, 복제, 정점 병합·스냅
-- **선택 막대** — 면이나 정점을 고르면 뷰 아래쪽에 몇 개를 골랐는지와 쓸 수 있는 동작이 나타남 (면: 돌출·삭제·면 색·옵션 / 정점: 병합·스냅·삭제). 키보드 없이도, 우클릭 메뉴와 같은 기능
-- **면 속성(`F`)** — 색, 양면, 음영, 텍스처, 뒤에 그리기
-- **프로젝트 목록(`O`)** — 숨김(눈), 잠금(자물쇠), 이름 변경, 원점 가운데로, 복제, 삭제
-- 3단계 플랫 음영, 투명 픽셀 처리, 텍스처/단색/와이어 렌더(`M`), 음영 전환(`L`)
-- 상단바는 도트 아이콘 — 마우스를 잠시 올리면 이름과 단축키가 툴팁으로 표시
-
-### 텍스처
-![텍스처 모드](docs/texture.png)
-
-- **RGBA 텍스처, 128 ~ 1024** — 도구줄의 크기 버튼으로 변경 (왼쪽 위 픽셀은 유지)
-- **도구** — UV(`V`), 펜(`B`), 스포이드(`I`), 채우기(`G`), 선, 사각형, 원, 영역 선택
-- **UV 편집** — 드래그, 꼭짓점 이동, 회전(`R`), 뒤집기(`H`), 크기(`T`+드래그), 복사/붙여넣기
-- **색 선택 창(`P`)** — 채도/명도 사각형, 색상 막대, 알파, 16진수 입력. 좌클릭 색 / 우클릭 색 따로 (`X`로 교환)
-- **팔레트** — 자주 쓰는 색 모음 (최대 256칸). 추가·덮어쓰기·삭제, 맨 앞 칸은 투명 (지우개)
-- 확대 단계 12.5% ~ 3200%, 창에 맞춤 (`1` 맞춤, `2` 100%, `3` 200%, `4` 400%)
-- PNG 가져오기 (최대 1024×1024, 크기 그대로)
-
-### 파일
-![파일 탐색 창](docs/file-browser.png)
-
-- 앱 안의 파일 탐색 창 — 모든 OS에서 같은 모양과 조작
-- 자체 포맷 `.tpm` (텍스트, 메쉬 + UV + 텍스처(PNG) + 팔레트). 0.4.x의 16색 파일도 열림
-- `.tpm` / `.png` 파일을 창에 끌어다 놓아도 열림
-
-### 내보내기
-![내보내기 창](docs/export.png)
-
-File → **export...** 를 누르면 전용 창이 뜹니다. 3D 형식과 저장 방식(폴더 / zip)을 고르면 무엇이 만들어지는지 미리 보여 줍니다.
-
-| 형식 | 폴더 또는 zip 안에 들어가는 파일 |
+### Requirements
+| Tool | Version / notes |
 |---|---|
-| OBJ + MTL | `이름.obj` + `이름.mtl` + `이름.png` |
-| glTF | `이름.gltf` + `이름.bin` + `이름.png` |
-| GLB | `이름.glb` (텍스처 포함) |
-
-텍스처를 쓰지 않는 단색 면의 색은 텍스처 PNG 아래쪽 색 띠에 함께 들어가서, 어느 엔진에서 열어도 같은 색으로 보입니다.
-
-### 도트 커서
-![커서](docs/cursors.png)
-
-상황에 따라 바뀌는 도트 커서 — 연필 심·페인트 통은 현재 색, 스포이드 액체는 커서 아래 색을 보여줍니다.
-
----
-
-## ✦ 빌드
-
-### 준비물
-| | |
-|---|---|
-| CMake | 3.25 이상 |
-| Ninja | 프리셋이 `Ninja Multi-Config` 사용 |
-| C 컴파일러 | C23 지원 (GCC 13+, Clang 17+) |
-| raylib 5.5 | 설치돼 있으면 사용, 없으면 CMake가 자동으로 받아서 빌드 |
-| Git | raylib을 자동으로 받을 때 필요 |
+| CMake | 3.25 or newer |
+| Ninja | the presets use `Ninja Multi-Config` |
+| C compiler | C23 support (GCC 13+, Clang 17+) |
+| raylib 5.5 | used if installed, otherwise CMake downloads and builds it |
+| Git | needed when raylib is downloaded automatically |
 
 <details>
 <summary><b>Windows</b>: MinGW-w64 (GCC)</summary>
 
-[Scoop](https://scoop.sh)으로 설치하는 방법 (PowerShell):
+With [Scoop](https://scoop.sh) (PowerShell):
 
 ```powershell
 scoop install git cmake ninja mingw
 ```
 
-또는 winget:
+Or with winget:
 
 ```powershell
 winget install Git.Git Kitware.CMake Ninja-build.Ninja BrechtSanders.WinLibs.POSIX.UCRT
 ```
 
-설치 후 새 터미널에서 `gcc --version`이 13 이상인지 확인하고, 아래 [명령](#명령)을 그대로 실행하면 됩니다.
-실행 파일은 `build\Windows\bin\Release\TinyPoly.exe`에 생깁니다.
+Open a new terminal, check that `gcc --version` is 13 or newer, and run the [commands](#commands) below.
+The executable ends up in `build\Windows\bin\Release\TinyPoly.exe`.
 
-VS Code에서는 `.vscode` 설정이 들어 있어서 **F5**로 바로 빌드 + 디버그 실행이 됩니다 (C/C++ 확장 필요).
+In VS Code, the included `.vscode` settings let you build and debug with **F5** (needs the C/C++ extension).
 
-> MSVC(Visual Studio)는 아직 테스트하지 않았습니다. MinGW GCC로 빌드해 주세요.
+> MSVC (Visual Studio) has not been tested yet. Please build with MinGW GCC.
 </details>
 
 <details>
-<summary><b>Linux</b>: raylib 빌드에 필요한 패키지</summary>
+<summary><b>Linux</b>: packages needed to build raylib</summary>
 
 ```sh
 # Debian / Ubuntu
@@ -125,52 +133,73 @@ brew install cmake ninja
 ```
 </details>
 
-### 명령
+### Commands
 ```sh
 cmake --preset default
-cmake --build --preset release      # 또는 debug
+cmake --build --preset release      # or debug
 ```
 
-실행 파일은 `build/<OS>/bin/Release/TinyPoly` 에 생깁니다 (`<OS>`는 `Windows`, `Darwin`, `Linux`).
+The executable ends up in `build/<OS>/bin/Release/TinyPoly` (`<OS>` is `Windows`, `Darwin` or `Linux`).
 
 ---
 
-## ✦ 조작 요약
+## ✦ Controls
 
-| 모델링 | | 텍스처 | |
+### Modeling
+| Input | Action |
+|---|---|
+| Click / drag | select, move |
+| Drag empty space (2D) / `Ctrl`+drag (3D) | box select (`Shift` adds) |
+| `R` / `T` + drag | rotate / scale |
+| `Shift` while dragging | move the origin |
+| Right-click | context menu |
+| Right-drag | orbit (3D) / pan (2D) |
+| Wheel / middle-drag | zoom / pan |
+| `E` / `X` / `Del` | extrude / delete face / delete vertex |
+| `F` / `G` | face / mesh properties |
+| `Ctrl+C` / `Ctrl+V` / `Ctrl+X` | copy / paste / delete mesh |
+| Arrow keys, WASD | move selection by one grid step (`Ctrl`: ¼ step) |
+| `Space` | fullscreen the view under the mouse |
+| `M` / `L` | render mode / shading |
+| `Tab` | texture mode |
+
+### Texture
+| Input | Action |
+|---|---|
+| `V` `B` `I` `G` | UV, pen, color picker, fill |
+| `Ctrl`+click | pick a color |
+| Right-click | draw with the second color (menu with the UV tool) |
+| `X` | swap left/right colors |
+| `R` / `H` / `T`+drag | rotate / flip / scale UVs |
+| Arrow keys, WASD | nudge UVs by one pixel |
+| `Ctrl+C` / `Ctrl+V` / `Del` | copy / paste / delete (UVs or selected area) |
+| `Space`+drag, middle-drag | pan |
+| Wheel / `1`–`4` | zoom / fit, 100, 200, 400% |
+| `Tab` | model mode |
+
+**Everywhere:** `Ctrl+Z/Y` undo/redo, `Ctrl+S` save, `Ctrl+Shift+S` save as, `Ctrl+O` open, `O` project window, `P` color window
+
+---
+
+## ✦ Roadmap
+
+- [ ] Animation timeline
+- [ ] GIF / sprite sheet export
+- [ ] Folders in the project window
+- [ ] Warning when closing without saving
+- [ ] Non-Latin file names (UI font)
+
+---
+
+## ✦ License
+
+TinyPoly is released under the [MIT License](LICENSE).
+
+Libraries used:
+
+| Library | Used for | License | How it's included |
 |---|---|---|---|
-| 좌클릭/드래그 | 선택·이동 | `V` `B` `I` `G` | UV·펜·스포이드·채우기 |
-| `R` / `T` + 드래그 | 회전 / 크기 | `Ctrl`+클릭 | 색 집기 |
-| 우클릭 | 메뉴 | 우클릭 | 보조색 (UV 도구는 메뉴) |
-| 휠 / 가운데 드래그 | 줌 / 화면 이동 | `Space`·가운데 드래그 | 화면 이동 |
-| `E` `X` `F` `G` | 돌출·면 삭제·면/메쉬 속성 | `R` `H` / `T`+드래그 | UV 회전·뒤집기 / 크기 |
-| 방향키·WASD | 이동 (`Ctrl` 미세) | `1`–`4` / 휠 | 맞춤·100·200·400% / 확대 |
-| | | `X` | 좌·우클릭 색 교환 |
-| `Tab` | 텍스처 모드 | `Tab` | 모델링 모드 |
+| [raylib](https://github.com/raysan5/raylib) 5.5 | window, input, rendering | zlib | downloaded by CMake at build time |
+| [microui](https://github.com/rxi/microui) 2.02 | UI | MIT | vendored unmodified in `src/microui/` |
 
-공통: `Ctrl+Z/Y` 되돌리기·다시, `Ctrl+S` 저장, `Ctrl+Shift+S` 다른 이름, `Ctrl+O` 열기, `O` 프로젝트, `P` 색 선택
-
----
-
-## ✦ 앞으로
-
-- [ ] 애니메이션 타임라인
-- [ ] GIF / 스프라이트시트 내보내기
-- [ ] 프로젝트 목록 폴더
-- [ ] 저장 안 하고 닫을 때 경고
-- [ ] 한글 파일 이름 표시 (UI 폰트)
-
----
-
-## ✦ 라이선스
-
-TinyPoly는 [MIT 라이선스](LICENSE)입니다.
-
-사용하는 라이브러리:
-
-| 라이브러리 | 용도 | 라이선스 | 포함 방식 |
-|---|---|---|---|
-| [raylib](https://github.com/raysan5/raylib) 5.5 | 창, 입력, 렌더링 | zlib | 빌드 시 CMake가 받아옴 |
-| [microui](https://github.com/rxi/microui) 2.02 | UI | MIT | `src/microui/`에 수정 없이 포함 |
-
-각 라이브러리의 저작권 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.
+Copyright notices for each library are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
