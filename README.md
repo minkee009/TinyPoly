@@ -115,16 +115,20 @@ The executable ends up in `build\Windows\bin\Release\TinyPoly.exe`.
 <details>
 <summary><b>Linux</b>: packages needed to build raylib</summary>
 
+**Debian / Ubuntu**
 ```sh
-# Debian / Ubuntu
 sudo apt install build-essential cmake ninja-build gdb \
     libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+```
 
-# Fedora
+**Fedora**
+```sh
 sudo dnf install gcc cmake ninja-build gdb \
     libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel
+```
 
-# Arch
+**Arch**
+```sh
 sudo pacman -S --needed base-devel cmake ninja gdb \
     libx11 libxrandr libxinerama libxcursor libxi mesa
 ```

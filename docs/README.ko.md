@@ -115,16 +115,20 @@ winget install Git.Git Kitware.CMake Ninja-build.Ninja BrechtSanders.WinLibs.POS
 <details>
 <summary><b>Linux</b>: raylib 빌드에 필요한 패키지</summary>
 
+**Debian / Ubuntu**
 ```sh
-# Debian / Ubuntu
 sudo apt install build-essential cmake ninja-build gdb \
     libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+```
 
-# Fedora
+**Fedora**
+```sh
 sudo dnf install gcc cmake ninja-build gdb \
     libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel
+```
 
-# Arch
+**Arch**
+```sh
 sudo pacman -S --needed base-devel cmake ninja gdb \
     libx11 libxrandr libxinerama libxcursor libxi mesa
 ```
