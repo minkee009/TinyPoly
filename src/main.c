@@ -217,10 +217,20 @@ static void center_origin(App *a) {
     if (o->nverts) o->origin = Vector3Scale(Vector3Add(mn, mx), 0.5f);
 }
 
-static void menu_contents(App *a) {
+static int g_menu_need;   /* 이번 프레임 메뉴 글자 중 가장 넓은 것 */
+
+/* 메뉴용 버튼: 글자 폭을 재 두고 그냥 버튼 */
+static int menu_button(mu_Context *ctx, const char *label) {
+    int w = ctx->text_width(NULL, label, -1) + ctx->style->padding * 2 + 8;
+    if (w > g_menu_need) g_menu_need = w;
+    return mu_button(ctx, label);
+}
+
+static void menu_body(App *a, int width) {
     mu_Context *ctx = a->ui;
-    const int w1[] = { 200 };
-    const int w3[] = { 64, 64, 64 };
+    const int w1[] = { width };
+    const int third = (width - ctx->style->spacing * 2) / 3;
+    const int w3[] = { third, third, third };
     Object *o = app_active(a);
 
     switch (a->menu) {
@@ -228,33 +238,33 @@ static void menu_contents(App *a) {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "add mesh");
         for (int i = 0; i < PRIM_COUNT; i++)
-            if (mu_button(ctx, PRIM_NAMES[i])) { model_add_prim(a, i); close_popup(ctx); }
+            if (menu_button(ctx, PRIM_NAMES[i])) { model_add_prim(a, i); close_popup(ctx); }
         break;
     case MENU_VERTEX:
         mu_layout_row(ctx, 1, w1, 0);
-        if (mu_button(ctx, "merge"))        { model_merge(a); close_popup(ctx); }
-        if (mu_button(ctx, "snap to grid")) { model_snap(a); close_popup(ctx); }
-        if (mu_button(ctx, "delete (del)")) { model_delete_verts(a); close_popup(ctx); }
+        if (menu_button(ctx, "merge"))        { model_merge(a); close_popup(ctx); }
+        if (menu_button(ctx, "snap to grid")) { model_snap(a); close_popup(ctx); }
+        if (menu_button(ctx, "delete (del)")) { model_delete_verts(a); close_popup(ctx); }
         break;
     case MENU_FACE:
     case MENU_MESH:
         mu_layout_row(ctx, 1, w1, 0);
         if (a->menu == MENU_FACE) {
-            if (mu_button(ctx, "extrude (E)"))     { model_extrude(a); close_popup(ctx); }
-            if (mu_button(ctx, "delete face (X)")) { model_delete_faces(a); close_popup(ctx); }
-            if (mu_button(ctx, "face props (F)"))  a->menu = MENU_FACEPROPS;
+            if (menu_button(ctx, "extrude (E)"))     { model_extrude(a); close_popup(ctx); }
+            if (menu_button(ctx, "delete face (X)")) { model_delete_faces(a); close_popup(ctx); }
+            if (menu_button(ctx, "face props (F)"))  a->menu = MENU_FACEPROPS;
         } else {
-            if (mu_button(ctx, "mesh props (G)"))  a->menu = MENU_MESHPROPS;
+            if (menu_button(ctx, "mesh props (G)"))  a->menu = MENU_MESHPROPS;
         }
         mu_label(ctx, "mirror");
         mu_layout_row(ctx, 3, w3, 0);
-        if (mu_button(ctx, "x")) { model_mirror(a, 0); close_popup(ctx); }
-        if (mu_button(ctx, "y")) { model_mirror(a, 1); close_popup(ctx); }
-        if (mu_button(ctx, "z")) { model_mirror(a, 2); close_popup(ctx); }
+        if (menu_button(ctx, "x")) { model_mirror(a, 0); close_popup(ctx); }
+        if (menu_button(ctx, "y")) { model_mirror(a, 1); close_popup(ctx); }
+        if (menu_button(ctx, "z")) { model_mirror(a, 2); close_popup(ctx); }
         mu_layout_row(ctx, 1, w1, 0);
-        if (mu_button(ctx, "clone"))                 { model_clone(a); close_popup(ctx); }
-        if (mu_button(ctx, "copy (ctrl+c)"))         { model_copy(a); close_popup(ctx); }
-        if (mu_button(ctx, "delete mesh (ctrl+x)"))  { model_delete_mesh(a); close_popup(ctx); }
+        if (menu_button(ctx, "clone"))                 { model_clone(a); close_popup(ctx); }
+        if (menu_button(ctx, "copy (ctrl+c)"))         { model_copy(a); close_popup(ctx); }
+        if (menu_button(ctx, "delete mesh (ctrl+x)"))  { model_delete_mesh(a); close_popup(ctx); }
         break;
     case MENU_FACEPROPS:
     case MENU_FACECOLOR:
@@ -272,7 +282,7 @@ static void menu_contents(App *a) {
                     model_set_face_color(a, a->scene.palette[i]);
             mu_layout_row(ctx, 2, (int[]){ 22, 175 }, 0);
             ui_swatch(ctx, mu_layout_next(ctx), a->color);
-            if (mu_button(ctx, "use color 1")) model_set_face_color(a, (Color){ a->color.r, a->color.g, a->color.b, 255 });
+            if (menu_button(ctx, "use color 1")) model_set_face_color(a, (Color){ a->color.r, a->color.g, a->color.b, 255 });
         }
         if (a->menu != MENU_FACECOLOR) {
             mu_layout_row(ctx, 1, w1, 0);
@@ -291,17 +301,17 @@ static void menu_contents(App *a) {
         int hidden = o->hidden, locked = o->locked;
         if (mu_checkbox(ctx, "hidden", &hidden) & MU_RES_CHANGE) { app_mark(a); o = app_active(a); o->hidden = hidden; }
         if (mu_checkbox(ctx, "locked", &locked) & MU_RES_CHANGE) { app_mark(a); o = app_active(a); o->locked = locked; }
-        if (mu_button(ctx, "center to middle")) center_origin(a);
+        if (menu_button(ctx, "center to middle")) center_origin(a);
         break;
     }
     case MENU_UV:
         mu_layout_row(ctx, 1, w1, 0);
-        if (mu_button(ctx, "rotate (R)"))          { uv_rotate(a); }
-        if (mu_button(ctx, "flip h (H)"))          { uv_flip(a, false); }
-        if (mu_button(ctx, "flip v (shift+H)"))    { uv_flip(a, true); }
-        if (mu_button(ctx, "reset (project)"))     { uv_reset(a); }
-        if (mu_button(ctx, "copy uv (ctrl+c)"))    { uv_copy(a); close_popup(ctx); }
-        if (mu_button(ctx, "paste uv (ctrl+v)"))   { uv_paste(a); close_popup(ctx); }
+        if (menu_button(ctx, "rotate (R)"))          { uv_rotate(a); }
+        if (menu_button(ctx, "flip h (H)"))          { uv_flip(a, false); }
+        if (menu_button(ctx, "flip v (shift+H)"))    { uv_flip(a, true); }
+        if (menu_button(ctx, "reset (project)"))     { uv_reset(a); }
+        if (menu_button(ctx, "copy uv (ctrl+c)"))    { uv_copy(a); close_popup(ctx); }
+        if (menu_button(ctx, "paste uv (ctrl+v)"))   { uv_paste(a); close_popup(ctx); }
         break;
     case MENU_TEXSIZE: {
         mu_layout_row(ctx, 1, w1, 0);
@@ -312,7 +322,7 @@ static void menu_contents(App *a) {
             int n = sizes[i];
             bool cur = a->scene.tex->w == n && a->scene.tex->h == n;
             snprintf(l, sizeof l, cur ? "[%dx%d]" : "%dx%d", n, n);
-            if (mu_button(ctx, l) && !cur) {
+            if (menu_button(ctx, l) && !cur) {
                 app_mark(a);
                 scene_resize_tex(&a->scene, n, n);
                 paint_reset_selection();
@@ -328,18 +338,27 @@ static void menu_contents(App *a) {
     }
     case MENU_FILE:
         mu_layout_row(ctx, 2, (int[]){ 128, 128 }, 0);
-        if (mu_button(ctx, "new"))           { file_new(a); close_popup(ctx); }
-        if (mu_button(ctx, "open..."))       { close_popup(ctx); file_open(a); }
-        if (mu_button(ctx, "save"))          { close_popup(ctx); file_save(a); }
-        if (mu_button(ctx, "save as..."))    { close_popup(ctx); file_save_as(a); }
-        if (mu_button(ctx, "import png...")) { close_popup(ctx); file_import_png(a); }
-        if (mu_button(ctx, "export..."))     { close_popup(ctx); a->show_export = 1; }
+        if (menu_button(ctx, "new"))           { file_new(a); close_popup(ctx); }
+        if (menu_button(ctx, "open..."))       { close_popup(ctx); file_open(a); }
+        if (menu_button(ctx, "save"))          { close_popup(ctx); file_save(a); }
+        if (menu_button(ctx, "save as..."))    { close_popup(ctx); file_save_as(a); }
+        if (menu_button(ctx, "import png...")) { close_popup(ctx); file_import_png(a); }
+        if (menu_button(ctx, "export..."))     { close_popup(ctx); a->show_export = 1; }
         mu_layout_row(ctx, 1, (int[]){ 260 }, 0);
         mu_label(ctx, "or drop .tpm/.png here");
         break;
     default:
         break;
     }
+}
+
+/* 메뉴 폭: 지난 프레임에 그 메뉴에서 가장 긴 글자에 맞춤 (처음 열 때 한 프레임만 기본 폭) */
+static void menu_contents(App *a) {
+    static int widths[MENU_TEXSIZE + 1];
+    MenuKind k = a->menu;
+    g_menu_need = 0;
+    menu_body(a, widths[k] > 200 ? widths[k] : 200);
+    widths[k] = g_menu_need;
 }
 
 static void draw_topbar(App *a) {
