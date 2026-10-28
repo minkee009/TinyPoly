@@ -123,7 +123,7 @@ sudo apt install build-essential cmake ninja-build gdb \
 
 **Fedora**
 ```sh
-sudo dnf install gcc cmake ninja-build gdb \
+sudo dnf install gcc-c++ cmake ninja-build gdb \
     libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel
 ```
 
