@@ -7,7 +7,7 @@
 4분할 뷰에서 클릭·드래그로 메쉬를 만들고, 128×128 16색 텍스처를 직접 그려서<br>
 OBJ / glTF / GLB로 내보냅니다.
 
-![version](https://img.shields.io/badge/version-0.4.5-f8c040)
+![version](https://img.shields.io/badge/version-0.4.6-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)

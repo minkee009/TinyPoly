@@ -189,14 +189,6 @@ static int swatch(mu_Context *ctx, int key, Color c, bool mark1, bool mark2) {
     return 0;
 }
 
-static bool toggle_button(mu_Context *ctx, const char *label, bool on) {
-    char buf[64];
-    snprintf(buf, sizeof buf, on ? "[%s]" : "%s", label);
-    mu_push_id(ctx, label, (int)strlen(label));
-    bool r = mu_button(ctx, buf);
-    mu_pop_id(ctx);
-    return r;
-}
 
 static Face *first_selected_face(App *a) {
     Object *o = app_active(a);
@@ -321,23 +313,31 @@ static void draw_topbar(App *a) {
     cnt->rect = mu_rect(0, 0, GetScreenWidth(), TOPBAR_H);
     if (!mu_begin_window_ex(ctx, "top", cnt->rect, MU_OPT_NOTITLE | MU_OPT_NORESIZE | MU_OPT_NOCLOSE | MU_OPT_NOSCROLL))
         return;
-    mu_layout_row(ctx, 12, (int[]){ 60, 76, 96, 14, 36, 60, 60, 14, 100, 92, 92, -1 }, 20);
-    if (mu_button(ctx, "file")) app_open_menu(a, MENU_FILE);
-    if (toggle_button(ctx, "model", a->mode == MODE_MODEL)) a->mode = MODE_MODEL;
-    if (toggle_button(ctx, "texture", a->mode == MODE_TEXTURE)) a->mode = MODE_TEXTURE;
+    /* [파일]  ·  [모델][텍스처]  ·  [추가][되돌리기][다시]  ·  [프로젝트][렌더][음영]  파일 이름
+       빈 칸(label "")으로 묶음 사이를 띄운다 */
+    const int B = 34, GAP = 22;
+    mu_layout_row(ctx, 14, (int[]){ B, GAP, B, B, GAP, B, B, B, GAP, B, B, B, 12, -1 }, 22);
+    if (ui_icon_button(ctx, UI_ICON_FOLDER, "file", a->menu == MENU_FILE)) app_open_menu(a, MENU_FILE);
     mu_label(ctx, "");
-    if (mu_button(ctx, "+")) {
+    if (ui_icon_button(ctx, UI_ICON_CUBE, "model mode (tab)", a->mode == MODE_MODEL)) a->mode = MODE_MODEL;
+    if (ui_icon_button(ctx, UI_ICON_BRUSH, "texture mode (tab)", a->mode == MODE_TEXTURE)) a->mode = MODE_TEXTURE;
+    mu_label(ctx, "");
+    if (ui_icon_button(ctx, UI_ICON_PLUS, "add mesh", a->menu == MENU_ADD)) {
         a->add_at = (Vector3){ 0 };
         a->add_up = (Vector3){ 0, 1, 0 };
         app_open_menu(a, MENU_ADD);
     }
-    if (mu_button(ctx, "undo")) app_undo(a);
-    if (mu_button(ctx, "redo")) app_redo(a);
+    if (ui_icon_button(ctx, UI_ICON_UNDO, "undo (ctrl+z)", false)) app_undo(a);
+    if (ui_icon_button(ctx, UI_ICON_REDO, "redo (ctrl+y)", false)) app_redo(a);
     mu_label(ctx, "");
-    if (toggle_button(ctx, "project", a->show_overview)) a->show_overview = !a->show_overview;
-    static const char *rm[RENDER_COUNT] = { "tex (M)", "color (M)", "wire (M)" };
-    if (mu_button(ctx, rm[a->render_mode])) a->render_mode = (a->render_mode + 1) % RENDER_COUNT;
-    if (toggle_button(ctx, "shade", a->shading)) a->shading = !a->shading;
+    if (ui_icon_button(ctx, UI_ICON_LIST, "project (O)", a->show_overview)) a->show_overview = !a->show_overview;
+    static const int rm_icon[RENDER_COUNT] = { UI_ICON_RENDER_TEX, UI_ICON_RENDER_COLOR, UI_ICON_RENDER_WIRE };
+    static const char *rm_tip[RENDER_COUNT] = { "render: textured (M)", "render: color (M)", "render: wireframe (M)" };
+    if (ui_icon_button(ctx, rm_icon[a->render_mode], rm_tip[a->render_mode], false))
+        a->render_mode = (a->render_mode + 1) % RENDER_COUNT;
+    if (ui_icon_button(ctx, UI_ICON_SHADE, a->shading ? "shading: on (L)" : "shading: off (L)", a->shading))
+        a->shading = !a->shading;
+    mu_label(ctx, "");
     char buf[300];
     snprintf(buf, sizeof buf, "%s%s", GetFileName(a->path), a->dirty ? " *" : "");   /* 전체 경로는 창 제목에 */
     mu_label(ctx, buf);
@@ -354,10 +354,18 @@ static void draw_overview(App *a) {
     for (int i = 0; i < s->count; i++) {
         Object *o = &s->objs[i];
         mu_push_id(ctx, &i, sizeof i);
-        mu_layout_row(ctx, 3, (int[]){ 28, 28, -1 }, 0);
-        if (mu_button(ctx, o->hidden ? "-" : "o")) { app_mark(a); s->objs[i].hidden = !s->objs[i].hidden; }
+        mu_layout_row(ctx, 3, (int[]){ 30, 30, -1 }, 0);
+        if (ui_icon_button(ctx, o->hidden ? UI_ICON_EYE_OFF : UI_ICON_EYE,
+                           o->hidden ? "hidden (click to show)" : "visible (click to hide)", false)) {
+            app_mark(a);
+            s->objs[i].hidden = !s->objs[i].hidden;
+        }
         o = &s->objs[i];
-        if (mu_button(ctx, o->locked ? "L" : ".")) { app_mark(a); s->objs[i].locked = !s->objs[i].locked; }
+        if (ui_icon_button(ctx, o->locked ? UI_ICON_LOCK : UI_ICON_UNLOCK,
+                           o->locked ? "locked: can't click in views" : "unlocked (click to lock)", o->locked)) {
+            app_mark(a);
+            s->objs[i].locked = !s->objs[i].locked;
+        }
         o = &s->objs[i];
         if (a->rename_idx == i) {
             if (mu_textbox(ctx, o->name, sizeof o->name) & MU_RES_SUBMIT) a->rename_idx = -1;
@@ -374,12 +382,14 @@ static void draw_overview(App *a) {
         }
         mu_pop_id(ctx);
     }
-    mu_layout_row(ctx, 3, (int[]){ 84, 84, -1 }, 0);
-    if (mu_button(ctx, "clone"))  model_clone(a);
-    if (mu_button(ctx, "delete")) model_delete_mesh(a);
-    if (mu_button(ctx, "close"))  a->show_overview = 0;
+    /* 선택한 메쉬 복제/삭제, 창 닫기 */
+    mu_layout_row(ctx, 4, (int[]){ 34, 34, -36, -1 }, 0);
+    if (ui_icon_button(ctx, UI_ICON_CLONE, "clone selected mesh", false)) model_clone(a);
+    if (ui_icon_button(ctx, UI_ICON_TRASH, "delete selected mesh (ctrl+x)", false)) model_delete_mesh(a);
+    mu_label(ctx, "");
+    if (ui_icon_button(ctx, UI_ICON_CLOSE, "close (O)", false)) a->show_overview = 0;
     mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
-    mu_text(ctx, "o visible / L locked\ndouble-click: rename");
+    mu_label(ctx, "double-click: rename");
     mu_end_window(ctx);
 }
 
@@ -441,6 +451,7 @@ static void draw_palette_editor(App *a) {
 
 static void build_ui(App *a) {
     mu_Context *ctx = a->ui;
+    ui_tooltip_begin();
     mu_begin(ctx);
     draw_topbar(a);
     if (a->show_overview) draw_overview(a);
@@ -586,6 +597,7 @@ int main(void) {
             if (a->views[i].rect.width > 0) view_draw(a, &a->views[i]);
         draw_status(a);
         ui_render(a->ui);
+        ui_tooltip_draw();
         cursor_draw(a);
         EndDrawing();
     }

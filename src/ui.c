@@ -38,7 +38,223 @@ void ui_init(mu_Context *ctx) {
     ctx->style->colors[MU_COLOR_BUTTONFOCUS] = (mu_Color){ 110, 104, 140, 255 };
 }
 
+/* ---- 도트 아이콘: X는 글자색, A는 강조색(노랑), 나머지는 투명 ---- */
+
+static const char *ICON_ART[UI_ICON_END - UI_ICON_FOLDER][10] = {
+    [UI_ICON_FOLDER - UI_ICON_FOLDER] = {
+        "XXXX.....",
+        "X..XXXXXX",
+        "X.......X",
+        "XXXXXXXXX",
+        "X.......X",
+        "X.......X",
+        "X.......X",
+        "XXXXXXXXX",
+    },
+    [UI_ICON_CUBE - UI_ICON_FOLDER] = {
+        "....X....",
+        "..XX.XX..",
+        "XX.....XX",
+        "X.XX.XX.X",
+        "X...X...X",
+        "X...X...X",
+        "X...X...X",
+        ".XX.X.XX.",
+        "...XXX...",
+    },
+    [UI_ICON_BRUSH - UI_ICON_FOLDER] = {
+        ".......XX",
+        "......XXX",
+        ".....XXX.",
+        "....XXX..",
+        "...XXX...",
+        "..AXX....",
+        ".AAA.....",
+        "AAAA.....",
+        "AAA......",
+    },
+    [UI_ICON_PLUS - UI_ICON_FOLDER] = {
+        "...XXX...",
+        "...XXX...",
+        "...XXX...",
+        "XXXXXXXXX",
+        "XXXXXXXXX",
+        "XXXXXXXXX",
+        "...XXX...",
+        "...XXX...",
+        "...XXX...",
+    },
+    [UI_ICON_UNDO - UI_ICON_FOLDER] = {
+        "..X......",
+        ".XX......",
+        "XXXXXXX..",
+        ".XX....X.",
+        "..X.....X",
+        "........X",
+        "........X",
+        ".......X.",
+        "...XXXX..",
+    },
+    [UI_ICON_REDO - UI_ICON_FOLDER] = {
+        "......X..",
+        "......XX.",
+        "..XXXXXXX",
+        ".X....XX.",
+        "X.....X..",
+        "X........",
+        "X........",
+        ".X.......",
+        "..XXXX...",
+    },
+    [UI_ICON_LIST - UI_ICON_FOLDER] = {
+        "AA.XXXXXX",
+        "AA.XXXXXX",
+        ".........",
+        "AA.XXXXXX",
+        "AA.XXXXXX",
+        ".........",
+        "AA.XXXXXX",
+        "AA.XXXXXX",
+    },
+    [UI_ICON_RENDER_TEX - UI_ICON_FOLDER] = {
+        "XX..XX..",
+        "XX..XX..",
+        "..XX..XX",
+        "..XX..XX",
+        "XX..XX..",
+        "XX..XX..",
+        "..XX..XX",
+        "..XX..XX",
+    },
+    [UI_ICON_RENDER_COLOR - UI_ICON_FOLDER] = {
+        "XXXXXXXX",
+        "XAAAAAAX",
+        "XAAAAAAX",
+        "XAAAAAAX",
+        "XAAAAAAX",
+        "XAAAAAAX",
+        "XAAAAAAX",
+        "XXXXXXXX",
+    },
+    [UI_ICON_RENDER_WIRE - UI_ICON_FOLDER] = {
+        "XXXXXXXX",
+        "XX.....X",
+        "X.X....X",
+        "X..X...X",
+        "X...X..X",
+        "X....X.X",
+        "X.....XX",
+        "XXXXXXXX",
+    },
+    /* 반쯤 그늘진 공 */
+    [UI_ICON_SHADE - UI_ICON_FOLDER] = {
+        "..XXXXX..",
+        ".X..XXXX.",
+        "X...XXXXX",
+        "X...XXXXX",
+        "X...XXXXX",
+        "X...XXXXX",
+        "X...XXXXX",
+        ".X..XXXX.",
+        "..XXXXX..",
+    },
+    [UI_ICON_EYE - UI_ICON_FOLDER] = {
+        "..XXXXX..",
+        ".X.....X.",
+        "X..XXX..X",
+        "X..XAX..X",
+        "X..XXX..X",
+        ".X.....X.",
+        "..XXXXX..",
+    },
+    [UI_ICON_EYE_OFF - UI_ICON_FOLDER] = {
+        ".........",
+        ".........",
+        "X.......X",
+        ".X.....X.",
+        "..XXXXX..",
+        ".X..X..X.",
+        ".........",
+    },
+    [UI_ICON_LOCK - UI_ICON_FOLDER] = {
+        "..XXXX..",
+        ".X....X.",
+        ".X....X.",
+        "XXXXXXXX",
+        "X......X",
+        "X..AA..X",
+        "X..AA..X",
+        "X......X",
+        "XXXXXXXX",
+    },
+    [UI_ICON_UNLOCK - UI_ICON_FOLDER] = {
+        "..XXXX..",
+        ".X....X.",
+        ".X......",
+        "XXXXXXXX",
+        "X......X",
+        "X......X",
+        "X......X",
+        "X......X",
+        "XXXXXXXX",
+    },
+    [UI_ICON_CLONE - UI_ICON_FOLDER] = {
+        "XXXXX....",
+        "X...X....",
+        "X..XXXXXX",
+        "X..X....X",
+        "XXXX.A..X",
+        "...X.A..X",
+        "...XAAA.X",
+        "...X....X",
+        "...XXXXXX",
+    },
+    [UI_ICON_TRASH - UI_ICON_FOLDER] = {
+        "...XXX...",
+        "XXXXXXXXX",
+        ".X.....X.",
+        ".X.X.X.X.",
+        ".X.X.X.X.",
+        ".X.X.X.X.",
+        ".X.X.X.X.",
+        ".X.....X.",
+        "..XXXXX..",
+    },
+    [UI_ICON_CLOSE - UI_ICON_FOLDER] = {
+        "X.....X",
+        ".X...X.",
+        "..X.X..",
+        "...X...",
+        "..X.X..",
+        ".X...X.",
+        "X.....X",
+    },
+};
+
+static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
+    const char *const *rows = ICON_ART[id - UI_ICON_FOLDER];
+    const int s = UI_FONT_SCALE;
+    const Color accent = { 255, 200, 60, 255 };
+    int w = 0, h = 0;
+    while (h < 10 && rows[h]) {
+        int len = (int)strlen(rows[h]);
+        if (len > w) w = len;
+        h++;
+    }
+    int ox = rect.x + (rect.w - w * s) / 2, oy = rect.y + (rect.h - h * s) / 2;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; rows[y][x]; x++) {
+            char ch = rows[y][x];
+            if (ch == 'X') DrawRectangle(ox + x * s, oy + y * s, s, s, c);
+            else if (ch == 'A') DrawRectangle(ox + x * s, oy + y * s, s, s, accent);
+        }
+}
+
 static void draw_icon(int id, mu_Rect rect, mu_Color mc) {
+    if (id >= UI_ICON_FOLDER && id < UI_ICON_END) {
+        draw_pixel_icon(id, rect, to_color(mc));
+        return;
+    }
     float s  = (rect.w < rect.h ? rect.w : rect.h) * 0.5f;
     float cx = rect.x + rect.w / 2.0f;
     float cy = rect.y + rect.h / 2.0f;
@@ -133,4 +349,57 @@ void ui_input(mu_Context *ctx) {
         memcpy(buf, utf8, (size_t)len);
         mu_input_text(ctx, buf);
     }
+}
+
+/* ---- 아이콘 버튼 + 툴팁 ---- */
+
+static const char *g_tip;
+static mu_Id g_tip_id;
+static double g_tip_since;
+static bool g_tip_seen;
+
+bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
+    /* 켜진 상태는 버튼 색을 강조색 쪽으로 바꿔서 그림 */
+    mu_Color saved[3];
+    if (active) {
+        for (int i = 0; i < 3; i++) saved[i] = ctx->style->colors[MU_COLOR_BUTTON + i];
+        ctx->style->colors[MU_COLOR_BUTTON]      = (mu_Color){ 120, 104, 60, 255 };
+        ctx->style->colors[MU_COLOR_BUTTONHOVER] = (mu_Color){ 146, 126, 70, 255 };
+        ctx->style->colors[MU_COLOR_BUTTONFOCUS] = (mu_Color){ 170, 146, 80, 255 };
+    }
+    bool clicked = mu_button_ex(ctx, NULL, icon, MU_OPT_ALIGNCENTER) != 0;
+    if (active)
+        for (int i = 0; i < 3; i++) ctx->style->colors[MU_COLOR_BUTTON + i] = saved[i];
+
+    mu_Id id = ctx->last_id;
+    if (tip && ctx->hover == id) {
+        if (g_tip_id != id) {
+            g_tip_id = id;
+            g_tip_since = GetTime();
+        }
+        g_tip = tip;
+        g_tip_seen = true;
+    }
+    return clicked;
+}
+
+void ui_tooltip_begin(void) {
+    g_tip_seen = false;
+}
+
+void ui_tooltip_draw(void) {
+    if (!g_tip_seen) { g_tip_id = 0; return; }
+    if (GetTime() - g_tip_since < 0.35) return;
+
+    Font f = GetFontDefault();
+    Vector2 ts = MeasureTextEx(f, g_tip, font_size(), (float)UI_FONT_SCALE);
+    Vector2 m = GetMousePosition();
+    float w = ts.x + 12, h = ts.y + 8;
+    float x = m.x + 14, y = m.y + 22;
+    /* 화면 밖으로 나가지 않게 */
+    if (x + w > GetScreenWidth()) x = GetScreenWidth() - w - 2;
+    if (y + h > GetScreenHeight()) y = m.y - h - 6;
+    DrawRectangle((int)x, (int)y, (int)w, (int)h, (Color){ 20, 18, 28, 240 });
+    DrawRectangleLines((int)x, (int)y, (int)w, (int)h, (Color){ 255, 200, 60, 255 });
+    DrawTextEx(f, g_tip, (Vector2){ x + 6, y + 4 }, font_size(), (float)UI_FONT_SCALE, (Color){ 240, 236, 228, 255 });
 }
