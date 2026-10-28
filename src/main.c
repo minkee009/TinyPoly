@@ -8,6 +8,7 @@
 #ifndef TINYPOLY_VERSION
 #define TINYPOLY_VERSION "dev"     /* CMake가 프로젝트 버전으로 지정 */
 #endif
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,8 +63,9 @@ void app_open_menu(App *a, MenuKind m) {
 
 static void file_new(App *a) {
     app_mark(a);
-    scene_clear(&a->scene);
+    scene_release(&a->scene);
     scene_init(&a->scene);
+    paint_reset_selection();
     app_msg(a, "new project");
 }
 
@@ -79,7 +81,7 @@ static void save_to(App *a, const char *path) {
 }
 
 /* 파일 탐색 창이 무엇을 위해 열렸는지 */
-enum { FB_OPEN, FB_SAVE, FB_IMPORT_PNG, FB_EXPORT_OBJ, FB_EXPORT_GLTF, FB_EXPORT_GLB, FB_EXPORT_PNG };
+enum { FB_OPEN, FB_SAVE, FB_IMPORT_PNG, FB_EXPORT };
 static FileBrowser g_fb;
 
 static void file_save_as(App *a) {
@@ -97,8 +99,10 @@ static void open_path(App *a, const char *path) {
         if (path != a->path) snprintf(a->path, sizeof a->path, "%s", path);
         a->has_path = true;
         undo_reset();
+        paint_reset_selection();
         a->dirty = false;
         a->tex_dirty = true;
+        a->pal_sel = -1;
         app_msg(a, "opened %s", a->path);
     } else {
         app_msg(a, "open failed: %s", path);
@@ -111,33 +115,31 @@ static void file_open(App *a) {
 
 static void import_png(App *a, const char *path) {
     app_mark(a);
-    if (tex_import_png(&a->scene, path)) app_msg(a, "imported %s", path);
-    else app_msg(a, "import failed: %s", path);
+    if (tex_import_png(&a->scene, path)) {
+        paint_reset_selection();
+        a->tex_dirty = true;
+        app_msg(a, "imported %s (%dx%d)", path, a->scene.tex->w, a->scene.tex->h);
+    } else {
+        app_msg(a, "import failed: %s", path);
+    }
 }
 
 static void file_import_png(App *a) {
     fb_open(&g_fb, FB_IMPORT_PNG, "import texture (png)", ".png", false, a->has_path ? a->path : NULL);
 }
 
-/* 프로젝트 이름을 기본값으로 저장 위치를 묻는다. 실제 내보내기는 export_to */
-static void file_export(App *a, int action) {
-    static const struct { const char *ext, *title; } kinds[] = {
-        [FB_EXPORT_OBJ]  = { ".obj",  "export obj (+ mtl, png)" },
-        [FB_EXPORT_GLTF] = { ".gltf", "export gltf (+ bin, png)" },
-        [FB_EXPORT_GLB]  = { ".glb",  "export glb" },
-        [FB_EXPORT_PNG]  = { ".png",  "export texture png" },
-    };
+/* 내보내기 창에서 "export..": 프로젝트 이름을 기본값으로 폴더 이름 또는 zip 파일 위치를 묻는다 */
+static void file_export(App *a) {
     char start[sizeof a->path];
-    path_with_ext(start, sizeof start, a->path, action == FB_EXPORT_PNG ? "_texture.png" : kinds[action].ext);
-    fb_open(&g_fb, action, kinds[action].title, kinds[action].ext, true, start);
+    path_with_ext(start, sizeof start, a->path, a->exp_zip ? ".zip" : "");
+    if (a->exp_zip) fb_open(&g_fb, FB_EXPORT, "export to zip", ".zip", true, start);
+    else fb_open(&g_fb, FB_EXPORT, "export to folder (type a folder name)", "", true, start);
 }
 
-static void export_to(App *a, int action, const char *out) {
-    bool ok;
-    if (action == FB_EXPORT_OBJ) ok = export_obj(&a->scene, out);
-    else if (action == FB_EXPORT_PNG) ok = tex_export_png(&a->scene, out);
-    else ok = export_gltf(&a->scene, out, action == FB_EXPORT_GLB);
+static void export_to(App *a, const char *out) {
+    bool ok = export_scene(&a->scene, (ExportFormat)a->exp_format, a->exp_zip, out);
     app_msg(a, ok ? "exported %s" : "export failed: %s", out);
+    if (ok) a->show_export = 0;
 }
 
 /* 파일 탐색 창에서 경로가 확정되면 */
@@ -146,7 +148,7 @@ static void file_browser_done(App *a, int action, const char *path) {
     case FB_OPEN:       open_path(a, path); break;
     case FB_SAVE:       save_to(a, path); break;
     case FB_IMPORT_PNG: import_png(a, path); break;
-    default:            export_to(a, action, path); break;
+    case FB_EXPORT:     export_to(a, path); break;
     }
 }
 
@@ -177,7 +179,7 @@ static int swatch(mu_Context *ctx, int key, Color c, bool mark1, bool mark2) {
     mu_Id id = mu_get_id(ctx, &key, sizeof key);
     mu_Rect r = mu_layout_next(ctx);
     mu_update_control(ctx, id, r, 0);
-    mu_draw_rect(ctx, r, mu_color(c.r, c.g, c.b, 255));
+    ui_swatch(ctx, r, c);
     if (mark1) {
         mu_draw_box(ctx, r, mu_color(255, 255, 255, 255));
         mu_draw_box(ctx, mu_rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), mu_color(255, 255, 255, 255));
@@ -250,8 +252,13 @@ static void menu_contents(App *a) {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "face color");
         mu_layout_row(ctx, 8, (int[]){ 22, 22, 22, 22, 22, 22, 22, 22 }, 22);
-        for (int i = 0; i < PALETTE_SIZE; i++)
-            if (swatch(ctx, 2000 + i, a->scene.palette[i], f->color == i, false)) model_set_face_color(a, i);
+        int shown = a->scene.npalette < 64 ? a->scene.npalette : 64;
+        for (int i = 0; i < shown; i++)
+            if (swatch(ctx, 2000 + i, a->scene.palette[i], color_eq(f->color, a->scene.palette[i]), false) == 1)
+                model_set_face_color(a, a->scene.palette[i]);
+        mu_layout_row(ctx, 2, (int[]){ 22, 175 }, 0);
+        ui_swatch(ctx, mu_layout_next(ctx), a->color);
+        if (mu_button(ctx, "use color 1")) model_set_face_color(a, (Color){ a->color.r, a->color.g, a->color.b, 255 });
         mu_layout_row(ctx, 1, w1, 0);
         face_flag_checkbox(a, "double sided", FACE_DOUBLE, false);
         face_flag_checkbox(a, "shaded", FACE_NOSHADE, true);
@@ -285,21 +292,38 @@ static void menu_contents(App *a) {
         if (mu_button(ctx, "copy uv (ctrl+c)"))    { uv_copy(a); close_popup(ctx); }
         if (mu_button(ctx, "paste uv (ctrl+v)"))   { uv_paste(a); close_popup(ctx); }
         break;
+    case MENU_TEXSIZE: {
+        mu_layout_row(ctx, 1, w1, 0);
+        mu_label(ctx, "texture size");
+        static const int sizes[] = { 128, 256, 512, 1024 };
+        for (int i = 0; i < 4; i++) {
+            char l[24];
+            int n = sizes[i];
+            bool cur = a->scene.tex->w == n && a->scene.tex->h == n;
+            snprintf(l, sizeof l, cur ? "[%dx%d]" : "%dx%d", n, n);
+            if (mu_button(ctx, l) && !cur) {
+                app_mark(a);
+                scene_resize_tex(&a->scene, n, n);
+                paint_reset_selection();
+                a->tex_zoom = 0;
+                a->tex_pan = (Vector2){ 0 };
+                a->tex_dirty = true;
+                app_msg(a, "texture %dx%d", n, n);
+                close_popup(ctx);
+            }
+        }
+        mu_label(ctx, "keeps top-left");
+        break;
+    }
     case MENU_FILE:
         mu_layout_row(ctx, 2, (int[]){ 128, 128 }, 0);
         if (mu_button(ctx, "new"))           { file_new(a); close_popup(ctx); }
         if (mu_button(ctx, "open..."))       { close_popup(ctx); file_open(a); }
         if (mu_button(ctx, "save"))          { close_popup(ctx); file_save(a); }
         if (mu_button(ctx, "save as..."))    { close_popup(ctx); file_save_as(a); }
+        if (mu_button(ctx, "import png...")) { close_popup(ctx); file_import_png(a); }
+        if (mu_button(ctx, "export..."))     { close_popup(ctx); a->show_export = 1; }
         mu_layout_row(ctx, 1, (int[]){ 260 }, 0);
-        if (mu_button(ctx, "import texture png...")) { close_popup(ctx); file_import_png(a); }
-        mu_label(ctx, "export");
-        mu_layout_row(ctx, 3, (int[]){ 84, 84, 84 }, 0);
-        if (mu_button(ctx, "obj"))  { close_popup(ctx); file_export(a, FB_EXPORT_OBJ); }
-        if (mu_button(ctx, "gltf")) { close_popup(ctx); file_export(a, FB_EXPORT_GLTF); }
-        if (mu_button(ctx, "glb"))  { close_popup(ctx); file_export(a, FB_EXPORT_GLB); }
-        mu_layout_row(ctx, 1, (int[]){ 260 }, 0);
-        if (mu_button(ctx, "export texture png...")) { close_popup(ctx); file_export(a, FB_EXPORT_PNG); }
         mu_label(ctx, "or drop .tpm/.png here");
         break;
     default:
@@ -311,7 +335,9 @@ static void draw_topbar(App *a) {
     mu_Context *ctx = a->ui;
     mu_Container *cnt = mu_get_container(ctx, "top");
     cnt->rect = mu_rect(0, 0, GetScreenWidth(), TOPBAR_H);
-    if (!mu_begin_window_ex(ctx, "top", cnt->rect, MU_OPT_NOTITLE | MU_OPT_NORESIZE | MU_OPT_NOCLOSE | MU_OPT_NOSCROLL))
+    /* 배경은 화면 끝까지 붙도록 main에서 네모로 칠함 (둥근 모서리 없이) */
+    if (!mu_begin_window_ex(ctx, "top", cnt->rect,
+                            MU_OPT_NOTITLE | MU_OPT_NORESIZE | MU_OPT_NOCLOSE | MU_OPT_NOSCROLL | MU_OPT_NOFRAME))
         return;
     /* [파일]  ·  [모델][텍스처]  ·  [추가][되돌리기][다시]  ·  [프로젝트][렌더][음영]  파일 이름
        빈 칸(label "")으로 묶음 사이를 띄운다 */
@@ -393,59 +419,119 @@ static void draw_overview(App *a) {
     mu_end_window(ctx);
 }
 
-static void draw_palette_editor(App *a) {
+static void draw_color_window(App *a) {
     mu_Context *ctx = a->ui;
-    if (!mu_begin_window_ex(ctx, "palette (P)", mu_rect(GetScreenWidth() / 2 - 180, TOPBAR_H + 40, 380, 420), MU_OPT_NOCLOSE))
+    if (!mu_begin_window_ex(ctx, "color (P)", mu_rect(GetScreenWidth() / 2 - 112, TOPBAR_H + 40, 225, 372),
+                            MU_OPT_NOCLOSE | MU_OPT_NORESIZE))
         return;
-    Scene *s = &a->scene;
-    static bool marked;
-    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) marked = false;
-    #define MARK_ONCE() do { if (!marked) { app_mark(a); marked = true; } a->tex_dirty = true; } while (0)
+    Scene *sc = &a->scene;
+    Color *target = a->pick_target ? &a->color2 : &a->color;
 
-    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
-    mu_label(ctx, "LMB: color 1   RMB: color 2");
-    mu_layout_row(ctx, 8, (int[]){ 40, 40, 40, 40, 40, 40, 40, 40 }, 32);
-    for (int i = 0; i < PALETTE_SIZE; i++) {
-        int r = swatch(ctx, 3000 + i, s->palette[i], i == a->color, i == a->color2);
-        if (r == 1) a->color = i;
-        if (r == 2) a->color2 = i;
+    /* 바깥에서 색이 바뀌면(스포이드, 팔레트 클릭) HSV를 다시 맞춤. 회색이면 색상(h)은 유지 */
+    static float h, s, v, al;
+    static Color synced;
+    static bool init;
+    if (!init || !color_eq(*target, synced)) {
+        float hh;
+        color_to_hsv(*target, &hh, &s, &v);
+        if (s > 0 || !init) h = hh;
+        al = target->a / 255.0f;
+        synced = *target;
+        init = true;
     }
 
-    Color *c = &s->palette[a->color];
-    mu_Real rgb[3] = { c->r, c->g, c->b };
-    static const char *names[3] = { "r", "g", "b" };
-    for (int k = 0; k < 3; k++) {
-        mu_layout_row(ctx, 2, (int[]){ 20, -1 }, 0);
-        mu_label(ctx, names[k]);
-        mu_push_id(ctx, &k, sizeof k);
-        if (mu_slider_ex(ctx, &rgb[k], 0, 255, 1, "%.0f", MU_OPT_ALIGNCENTER) & MU_RES_CHANGE) {
-            MARK_ONCE();
-            c = &s->palette[a->color];
-            *c = (Color){ (unsigned char)rgb[0], (unsigned char)rgb[1], (unsigned char)rgb[2], 255 };
-        }
-        mu_pop_id(ctx);
+    mu_layout_row(ctx, 3, (int[]){ 84, 84, -1 }, 0);
+    if (ui_toggle_button(ctx, "color 1", a->pick_target == 0)) a->pick_target = 0;
+    if (ui_toggle_button(ctx, "color 2", a->pick_target == 1)) a->pick_target = 1;
+    if (ui_icon_button(ctx, UI_ICON_CLOSE, "close (P)", false)) a->show_color = 0;
+    target = a->pick_target ? &a->color2 : &a->color;
+
+    if (ui_color_picker(ctx, &h, &s, &v, &al)) {
+        *target = color_from_hsv(h, s, v, (unsigned char)lroundf(al * 255));
+        synced = *target;
     }
 
-    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
-    mu_label(ctx, "shading ramp (click: set to color 2)");
-    mu_layout_row(ctx, 16, (int[]){ 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20 }, 16);
-    for (int i = 0; i < PALETTE_SIZE; i++) swatch(ctx, 4000 + i, s->palette[i], false, false);
-    for (int i = 0; i < PALETTE_SIZE; i++)
-        if (swatch(ctx, 5000 + i, s->palette[s->ramp[i]], false, false) == 1) {
-            MARK_ONCE();
-            a->scene.ramp[i] = (unsigned char)a->color2;
-        }
+    /* 미리보기 + 16진수 (RRGGBB 또는 RRGGBBAA) */
+    static char hex[12];
+    static bool hex_active;
+    if (!hex_active) snprintf(hex, sizeof hex, "%02X%02X%02X%02X", target->r, target->g, target->b, target->a);
+    mu_layout_row(ctx, 2, (int[]){ 40, -1 }, 24);
+    ui_swatch(ctx, mu_layout_next(ctx), *target);
+    int res = mu_textbox(ctx, hex, sizeof hex);
+    hex_active = ctx->focus == ctx->last_id;
+    if (res & MU_RES_CHANGE) {
+        unsigned int r, g, b, al8 = 255;
+        size_t len = strlen(hex);
+        if ((len == 6 && sscanf(hex, "%2x%2x%2x", &r, &g, &b) == 3) ||
+            (len == 8 && sscanf(hex, "%2x%2x%2x%2x", &r, &g, &b, &al8) == 4))
+            *target = (Color){ (unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)al8 };
+    }
 
-    mu_layout_row(ctx, 3, (int[]){ 116, 116, -1 }, 0);
-    if (mu_button(ctx, "auto shade")) { MARK_ONCE(); tex_auto_ramp(&a->scene); }
-    if (mu_button(ctx, "swap 1<>2"))  { MARK_ONCE(); tex_swap_colors(&a->scene, a->color, a->color2); }
-    if (mu_button(ctx, "ramp 1..2"))  { MARK_ONCE(); tex_make_gradient(&a->scene, a->color, a->color2); }
-    if (mu_button(ctx, "bg = 1"))     { MARK_ONCE(); a->scene.bg = a->color; }
-    if (mu_button(ctx, "alpha = 1"))  { MARK_ONCE(); a->scene.alpha = a->color; }
-    if (mu_button(ctx, "reset"))      { MARK_ONCE(); scene_reset_palette(&a->scene); }
+    /* 팔레트 관리 */
+    bool has_sel = a->pal_sel >= 0 && a->pal_sel < sc->npalette;
     mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
-    if (mu_button(ctx, "close")) a->show_palette = 0;
-    #undef MARK_ONCE
+    mu_label(ctx, has_sel ? "palette (swatch selected)" : "palette");
+    mu_layout_row(ctx, 3, (int[]){ 66, 66, -1 }, 0);
+    if (mu_button(ctx, "add") && sc->npalette < MAX_PALETTE) {
+        app_mark(a);
+        sc->palette[sc->npalette++] = *target;
+        a->pal_sel = sc->npalette - 1;
+    }
+    if (mu_button(ctx, "set") && has_sel) {
+        app_mark(a);
+        sc->palette[a->pal_sel] = *target;
+    }
+    if (mu_button(ctx, "del") && has_sel) {
+        app_mark(a);
+        memmove(&sc->palette[a->pal_sel], &sc->palette[a->pal_sel + 1], sizeof(Color) * (size_t)(sc->npalette - a->pal_sel - 1));
+        sc->npalette--;
+        a->pal_sel = -1;
+    }
+    mu_layout_row(ctx, 2, (int[]){ 101, -1 }, 0);
+    if (mu_button(ctx, "swap (X)")) { Color t = a->color; a->color = a->color2; a->color2 = t; }
+    if (mu_button(ctx, "bg color")) {
+        app_mark(a);
+        sc->bg = (Color){ target->r, target->g, target->b, 255 };
+    }
+    mu_end_window(ctx);
+}
+
+static void draw_export_window(App *a) {
+    mu_Context *ctx = a->ui;
+    int W = GetScreenWidth(), H = GetScreenHeight();
+    if (!mu_begin_window_ex(ctx, "export", mu_rect(W / 2 - 200, H / 2 - 170, 400, 340), MU_OPT_NOCLOSE | MU_OPT_NORESIZE))
+        return;
+    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
+    mu_label(ctx, "3d file");
+    mu_layout_row(ctx, 3, (int[]){ 120, 120, -1 }, 0);
+    static const char *formats[EXPORT_FORMAT_COUNT] = { "obj + mtl", "gltf", "glb" };
+    for (int i = 0; i < EXPORT_FORMAT_COUNT; i++)
+        if (ui_toggle_button(ctx, formats[i], a->exp_format == i)) a->exp_format = i;
+
+    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
+    mu_label(ctx, "save as");
+    mu_layout_row(ctx, 2, (int[]){ 182, -1 }, 0);
+    if (ui_toggle_button(ctx, "folder", !a->exp_zip)) a->exp_zip = 0;
+    if (ui_toggle_button(ctx, "zip", a->exp_zip)) a->exp_zip = 1;
+
+    /* 무엇이 만들어지는지 미리 보여줌 */
+    char base[96], names[4][96];
+    snprintf(base, sizeof base, "%s", GetFileNameWithoutExt(a->path));
+    int n = export_file_names((ExportFormat)a->exp_format, base, names, 4);
+    mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
+    mu_label(ctx, "creates:");
+    char line[400];
+    snprintf(line, sizeof line, a->exp_zip ? "  %s.zip" : "  %s/", base);
+    mu_label(ctx, line);
+    for (int i = 0; i < n; i++) {
+        snprintf(line, sizeof line, "      %s", names[i]);
+        mu_label(ctx, line);
+    }
+    mu_label(ctx, a->exp_format == EXPORT_GLB ? "  (texture is inside the glb)" : "  (png = texture)");
+
+    mu_layout_row(ctx, 2, (int[]){ 182, -1 }, 0);
+    if (mu_button(ctx, "export...")) file_export(a);
+    if (mu_button(ctx, "cancel")) a->show_export = 0;
     mu_end_window(ctx);
 }
 
@@ -455,7 +541,8 @@ static void build_ui(App *a) {
     mu_begin(ctx);
     draw_topbar(a);
     if (a->show_overview) draw_overview(a);
-    if (a->show_palette) draw_palette_editor(a);
+    if (a->show_color) draw_color_window(a);
+    if (a->show_export) draw_export_window(a);
 
     if (a->open_menu) {
         mu_open_popup(ctx, "menu");
@@ -484,7 +571,7 @@ static void draw_status(const App *a) {
                "E extrude  X del face  F/G props  M render  L shade  O project  tab: texture";
     else
         text = "V uv  B pen  I pick  G fill  ctrl+click: pick  R/H: rotate/flip uv  T+drag: scale uv  "
-               "space/MMB: pan  1-4 zoom  P palette  tab: model";
+               "space/MMB: pan  1-4 zoom  X swap  P color  tab: model";
     DrawTextEx(GetFontDefault(), text, (Vector2){ 8, (float)y + 2 }, 20, 2, (Color){ 220, 216, 230, 255 });
 }
 
@@ -500,7 +587,7 @@ static void global_keys(App *a) {
     }
     if (IsKeyPressed(KEY_TAB)) a->mode = a->mode == MODE_MODEL ? MODE_TEXTURE : MODE_MODEL;
     if (IsKeyPressed(KEY_O)) a->show_overview = !a->show_overview;
-    if (IsKeyPressed(KEY_P)) a->show_palette = !a->show_palette;
+    if (IsKeyPressed(KEY_P)) a->show_color = !a->show_color;
 }
 
 int main(void) {
@@ -543,9 +630,11 @@ int main(void) {
     a->snap = 1;
     a->pixel = 2;
     a->tool = TOOL_PEN;
-    a->color = 12;
-    a->color2 = 7;
-    a->tex_zoom = 2;
+    a->color = DEFAULT_PALETTE[12];
+    a->color2 = DEFAULT_PALETTE[7];
+    a->pal_sel = -1;
+    a->tex_zoom = 0;                /* 창에 맞춤 */
+    a->exp_format = EXPORT_GLB;
     a->tex_grid = 1;
     a->rename_idx = -1;
     snprintf(a->path, sizeof a->path, "model.tpm");
@@ -596,6 +685,7 @@ int main(void) {
         for (int i = 0; i < VIEW_COUNT; i++)
             if (a->views[i].rect.width > 0) view_draw(a, &a->views[i]);
         draw_status(a);
+        DrawRectangle(0, 0, GetScreenWidth(), TOPBAR_H, (Color){ 34, 32, 44, 255 });
         ui_render(a->ui);
         ui_tooltip_draw();
         cursor_draw(a);

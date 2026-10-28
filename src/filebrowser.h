@@ -23,7 +23,8 @@ typedef struct {
     int last_index;
 } FileBrowser;
 
-/* start: 처음 보여줄 파일 또는 폴더 경로 (NULL이면 작업 폴더) */
+/* start: 처음 보여줄 파일 또는 폴더 경로 (NULL이면 작업 폴더)
+   ext가 빈 문자열이면 폴더 고르기: 목록엔 폴더만, 이름 칸에 적은 폴더 경로를 돌려줌 */
 void fb_open(FileBrowser *fb, int action, const char *title, const char *ext, bool save, const char *start);
 void fb_close(FileBrowser *fb);
 /* 매 프레임 mu_begin/mu_end 사이에서 호출. 사용자가 확정하면 true와 함께 전체 경로를 out에 */

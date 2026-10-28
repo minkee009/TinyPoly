@@ -194,10 +194,8 @@ void cursor_draw(App *a) {
     }
 
     /* 스포이드는 커서 아래 텍셀 색, 나머지는 현재 색 */
-    Color dyn = a->scene.palette[a->color];
-    if (kind == CURSOR_PICKER) {
-        int t = paint_hover_texel(a);
-        if (t >= 0) dyn = a->scene.palette[t];
-    }
+    Color dyn = a->color;
+    if (kind == CURSOR_PICKER) paint_hover_texel(a, &dyn);
+    dyn.a = 255;                    /* 커서 안의 색은 불투명하게 */
     draw_art(&ART[kind], GetMousePosition(), dyn);
 }

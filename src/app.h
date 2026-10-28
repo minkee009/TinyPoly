@@ -17,7 +17,7 @@ enum { TOOL_UV, TOOL_PEN, TOOL_PICK, TOOL_FILL, TOOL_LINE, TOOL_RECT, TOOL_CIRCL
 
 typedef enum {
     MENU_NONE, MENU_ADD, MENU_VERTEX, MENU_FACE, MENU_MESH,
-    MENU_FACEPROPS, MENU_MESHPROPS, MENU_FILE, MENU_UV,
+    MENU_FACEPROPS, MENU_MESHPROPS, MENU_FILE, MENU_UV, MENU_TEXSIZE,
 } MenuKind;
 
 typedef struct {
@@ -44,10 +44,15 @@ typedef struct {
     int pixel;                 /* 뷰 저해상도 배율 */
 
     /* 텍스처 모드 */
-    int tool, color, color2;
+    int tool;
+    Color color, color2;       /* 좌클릭 / 우클릭으로 칠하는 색 */
+    int pick_target;           /* 색 선택 창이 고치는 색: 0 = color, 1 = color2 */
+    int pal_sel;               /* 팔레트에서 고른 칸, 없으면 -1 */
     int rect_filled, circle_filled;
-    int tex_zoom, tex_grid;
+    float tex_zoom;            /* 텍셀 하나의 화면 픽셀 수, 0이면 창에 맞춤 */
+    int tex_grid;
     Vector2 tex_pan;
+    int pal_scroll;            /* 팔레트 줄이 넘칠 때 첫 줄 */
     Rectangle canvas_rect;
 
     /* 메뉴/창 */
@@ -55,11 +60,17 @@ typedef struct {
     bool open_menu;            /* 이번 프레임에 팝업을 연다 */
     int menu_view;
     Vector3 add_at, add_up;
-    int show_overview, show_palette;
+    int show_overview, show_color, show_export;
     int rename_idx;
+    int exp_format, exp_zip;   /* 내보내기 창 설정 */
 
-    Texture2D gpu_tex[3];      /* 음영 단계별 텍스처 */
-    bool tex_dirty;
+    /* GPU 텍스처: 장면 텍스처를 그대로 올림 (음영은 정점 색으로 곱함) */
+    Texture2D gpu_tex;
+    int gpu_w, gpu_h;
+    const TexBuf *gpu_src;
+    bool tex_dirty;            /* 전체를 다시 올림 */
+    bool tex_rect_dirty;       /* 아래 영역만 다시 올림 */
+    int dx0, dy0, dx1, dy1;
     Shader shader;
 
     Object clipboard;
@@ -89,6 +100,7 @@ void view_init(App *a);
 void view_layout(App *a);
 void view_update_cameras(App *a);
 void view_upload_texture(App *a);
+void view_tex_dirty(App *a, int x0, int y0, int x1, int y1);   /* 텍스처 일부만 바뀜 (텍셀, 양끝 포함) */
 void view_draw(App *a, Viewport *vp);
 int  view_at(const App *a, Vector2 m);
 Ray  view_ray(const Viewport *vp, Vector2 m);
@@ -113,13 +125,14 @@ void model_clone(App *a);
 void model_copy(App *a);
 void model_paste(App *a);
 void model_set_face_flag(App *a, int flag, bool on);
-void model_set_face_color(App *a, int color);
+void model_set_face_color(App *a, Color color);
 
 /* paint.c */
 void paint_update(App *a, bool input_ok);
 void paint_draw(App *a);
+void paint_reset_selection(void);       /* 텍스처 크기가 바뀌면 선택 해제 */
 int  paint_cursor(App *a);              /* 캔버스 위에서 보여줄 커서, 해당 없으면 -1 */
-int  paint_hover_texel(const App *a);   /* 커서 아래 텍셀 색 인덱스, 캔버스 밖이면 -1 */
+bool paint_hover_texel(const App *a, Color *out);   /* 커서 아래 텍셀 색, 캔버스 밖이면 false */
 
 /* cursor.c: OS 커서 대신 그리는 도트 커서 (맨 마지막에 그림) */
 enum {

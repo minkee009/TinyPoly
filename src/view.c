@@ -5,6 +5,8 @@
 #include <float.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 Rectangle g_box;
 
@@ -32,13 +34,7 @@ static const char *FS =
 
 void view_init(App *a) {
     a->shader = LoadShaderFromMemory(VS, FS);
-    Image img = GenImageColor(TEX_W, TEX_H, WHITE);
-    for (int k = 0; k < 3; k++) {
-        a->gpu_tex[k] = LoadTextureFromImage(img);
-        SetTextureFilter(a->gpu_tex[k], TEXTURE_FILTER_POINT);
-    }
-    UnloadImage(img);
-    a->tex_dirty = true;
+    a->tex_dirty = true;            /* 첫 view_upload_texture에서 만든다 */
 
     static const Vector3 centers[VIEW_COUNT] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0.5f, 0 }, { 0, 0.5f, 0 } };
     for (int i = 0; i < VIEW_COUNT; i++) {
@@ -48,14 +44,44 @@ void view_init(App *a) {
     }
 }
 
-void view_upload_texture(App *a) {
-    if (!a->tex_dirty) return;
-    static Color px[TEX_W * TEX_H];
-    for (int k = 0; k < 3; k++) {
-        tex_build_rgba(&a->scene, k, px);
-        UpdateTexture(a->gpu_tex[k], px);
+void view_tex_dirty(App *a, int x0, int y0, int x1, int y1) {
+    if (!a->tex_rect_dirty) {
+        a->dx0 = x0; a->dy0 = y0; a->dx1 = x1; a->dy1 = y1;
+        a->tex_rect_dirty = true;
+        return;
     }
+    if (x0 < a->dx0) a->dx0 = x0;
+    if (y0 < a->dy0) a->dy0 = y0;
+    if (x1 > a->dx1) a->dx1 = x1;
+    if (y1 > a->dy1) a->dy1 = y1;
+}
+
+/* 크기가 바뀌었거나 다른 버퍼(되돌리기 등)면 새로 올리고, 아니면 바뀐 영역만 올린다 */
+void view_upload_texture(App *a) {
+    const TexBuf *t = a->scene.tex;
+    if (!IsTextureValid(a->gpu_tex) || a->gpu_w != t->w || a->gpu_h != t->h) {
+        if (IsTextureValid(a->gpu_tex)) UnloadTexture(a->gpu_tex);
+        Image img = { (void *)t->px, t->w, t->h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+        a->gpu_tex = LoadTextureFromImage(img);
+        SetTextureFilter(a->gpu_tex, TEXTURE_FILTER_POINT);
+        a->gpu_w = t->w;
+        a->gpu_h = t->h;
+    } else if (a->tex_dirty || a->gpu_src != t) {
+        UpdateTexture(a->gpu_tex, t->px);
+    } else if (a->tex_rect_dirty) {
+        int x0 = a->dx0 < 0 ? 0 : a->dx0, y0 = a->dy0 < 0 ? 0 : a->dy0;
+        int x1 = a->dx1 >= t->w ? t->w - 1 : a->dx1, y1 = a->dy1 >= t->h ? t->h - 1 : a->dy1;
+        if (x1 >= x0 && y1 >= y0) {
+            int w = x1 - x0 + 1, h = y1 - y0 + 1;
+            Color *tmp = malloc(sizeof(Color) * (size_t)w * (size_t)h);
+            for (int y = 0; y < h; y++) memcpy(&tmp[y * w], &t->px[(y0 + y) * t->w + x0], sizeof(Color) * (size_t)w);
+            UpdateTextureRec(a->gpu_tex, (Rectangle){ (float)x0, (float)y0, (float)w, (float)h }, tmp);
+            free(tmp);
+        }
+    }
+    a->gpu_src = t;
     a->tex_dirty = false;
+    a->tex_rect_dirty = false;
 }
 
 static void set_rect(App *a, Viewport *vp, Rectangle r) {
@@ -215,12 +241,13 @@ static void draw_meshes(App *a) {
             if (behind) rlDisableDepthMask(); else rlEnableDepthMask();
             if (dbl) rlDisableBackfaceCulling(); else rlEnableBackfaceCulling();
 
-            for (int slot = -1; slot < 3; slot++) {
+            /* 0: 단색 면 (기본 흰 텍스처), 1: 텍스처 면 */
+            for (int pass = 0; pass < 2; pass++) {
                 /* rlBegin은 모드가 바뀌면 텍스처를 기본값으로 되돌리므로,
                    배치를 비운 뒤 rlBegin 다음에 텍스처를 지정한다 */
                 rlDrawRenderBatchActive();
                 rlBegin(RL_TRIANGLES);
-                rlSetTexture(slot < 0 ? rlGetTextureIdDefault() : a->gpu_tex[slot].id);
+                rlSetTexture(pass == 0 ? rlGetTextureIdDefault() : a->gpu_tex.id);
                 for (int i = 0; i < s->count; i++) {
                     const Object *o = &s->objs[i];
                     if (o->hidden) continue;
@@ -230,16 +257,17 @@ static void draw_meshes(App *a) {
                         Vector3 n = obj_face_normal(o, f);
                         int level = (a->shading && !(f->flags & FACE_NOSHADE)) ? light_level(n) : 0;
                         bool textured = a->render_mode != RENDER_COLOR && !(f->flags & FACE_NOTEX);
-                        if ((textured ? level : -1) != slot) continue;
+                        if (textured != (pass == 1)) continue;
 
-                        Color c = textured ? WHITE : tex_shade_color(s, f->color, level);
+                        /* 텍스처 면은 흰색에 음영만 곱함 */
+                        Color c = shade_color(textured ? WHITE : f->color, level);
                         if (f->sel && i == s->active && blink) c = ColorLerp(c, SEL_COLOR, 0.6f);
                         rlColor4ub(c.r, c.g, c.b, 255);
                         for (int j = 1; j + 1 < f->n; j++) {
                             int idx[3] = { 0, j, j + 1 };
                             for (int m = 0; m < 3; m++) {
                                 Vector3 p = o->verts[f->v[idx[m]]].p;
-                                rlTexCoord2f(f->uv[idx[m]].x / TEX_W, f->uv[idx[m]].y / TEX_H);
+                                rlTexCoord2f(f->uv[idx[m]].x / a->gpu_w, f->uv[idx[m]].y / a->gpu_h);
                                 rlVertex3f(p.x, p.y, p.z);
                             }
                         }
@@ -307,7 +335,7 @@ static void draw_grid(const App *a, const Viewport *vp, Color c) {
 }
 
 static Color bg_color(const App *a) {
-    return a->scene.palette[a->scene.bg];
+    return a->scene.bg;
 }
 
 static Color grid_color(const App *a) {

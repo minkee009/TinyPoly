@@ -3,30 +3,25 @@
 
 #include "mesh.h"
 
-/* 음영 단계(level)만큼 ramp를 따라간 팔레트 인덱스 */
-int   tex_shade_index(const Scene *s, int idx, int level);
-Color tex_shade_color(const Scene *s, int idx, int level);
+/* 음영 단계(0~2)만큼 어둡게. 플랫 셰이딩이라 단계가 뚝뚝 끊기는 도트 느낌 유지 */
+float shade_factor(int level);
+Color shade_color(Color c, int level);
 
-/* 128x128 RGBA. 투명색 인덱스는 alpha 0 */
-void tex_build_rgba(const Scene *s, int level, Color *out);
+bool color_eq(Color a, Color b);
 
-/* 그리기: buf는 TEX_W*TEX_H 인덱스 버퍼 (미리보기용 사본에도 그릴 수 있게) */
-void tex_plot(unsigned char *buf, int x, int y, int c);
-void tex_line(unsigned char *buf, int x0, int y0, int x1, int y1, int c);
-void tex_rect(unsigned char *buf, int x0, int y0, int x1, int y1, int c, bool filled);
-void tex_ellipse(unsigned char *buf, int x0, int y0, int x1, int y1, int c, bool filled);
-void tex_fill(unsigned char *buf, int x, int y, int c);
+/* 그리기: buf는 w*h RGBA (미리보기용 사본에도 그릴 수 있게) */
+typedef struct { Color *px; int w, h; } Canvas;
+void tex_plot(Canvas c, int x, int y, Color col);
+void tex_line(Canvas c, int x0, int y0, int x1, int y1, Color col);
+void tex_rect(Canvas c, int x0, int y0, int x1, int y1, Color col, bool filled);
+void tex_ellipse(Canvas c, int x0, int y0, int x1, int y1, Color col, bool filled);
+void tex_fill(Canvas c, int x, int y, Color col);
 
-void tex_auto_ramp(Scene *s);
-void tex_swap_colors(Scene *s, int a, int b);     /* 팔레트 + 텍스처 픽셀 모두 */
-void tex_make_gradient(Scene *s, int a, int b);   /* a~b 사이 팔레트 색을 보간 */
+/* PNG 가져오기: 크기는 MAX_TEX_SIZE까지 그대로 (넘으면 잘림) */
+bool tex_import_png(Scene *s, const char *path);
 
-bool  tex_import_png(Scene *s, const char *path);
-bool  tex_export_png(const Scene *s, const char *path);
-
-/* 내보내기용: 텍스처 아래에 팔레트 띠(8px)를 붙인 이미지. 단색 면은 이 띠를 UV로 가리킴 */
-#define ATLAS_H (TEX_H + 8)
-Image   tex_atlas_image(const Scene *s);
-Vector2 tex_atlas_color_uv(int idx);   /* 픽셀 좌표 (띠 칸 중앙) */
+/* 색 변환 (h: 0~360, s/v: 0~1) */
+Color color_from_hsv(float h, float s, float v, unsigned char a);
+void  color_to_hsv(Color c, float *h, float *s, float *v);
 
 #endif

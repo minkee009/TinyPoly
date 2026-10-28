@@ -23,7 +23,7 @@ int obj_add_vert(Object *o, Vector3 p) {
     return o->nverts++;
 }
 
-int obj_add_face(Object *o, const int *idx, int n, int color) {
+int obj_add_face(Object *o, const int *idx, int n, Color color) {
     if (n < 3 || n > MAX_FACE_VERTS) return -1;
     o->faces = grow(o->faces, &o->cfaces, o->nfaces + 1, sizeof(Face));
     Face *f = &o->faces[o->nfaces];
@@ -78,7 +78,7 @@ void obj_translate(Object *o, Vector3 d) {
     o->origin = Vector3Add(o->origin, d);
 }
 
-void obj_project_uv(Object *o, Face *f) {
+void obj_project_uv(Object *o, Face *f, float uv_scale) {
     Vector3 n = obj_face_normal(o, f);
     float ax = fabsf(n.x), ay = fabsf(n.y), az = fabsf(n.z);
     float umin = 1e9f, vmin = 1e9f;
@@ -88,7 +88,7 @@ void obj_project_uv(Object *o, Face *f) {
         if (ay >= ax && ay >= az) { u = n.y > 0 ? p.x : -p.x; v = p.z; }
         else if (ax >= az)        { u = n.x > 0 ? -p.z : p.z; v = -p.y; }
         else                      { u = n.z > 0 ? p.x : -p.x; v = -p.y; }
-        f->uv[k] = (Vector2){ u * UV_SCALE, v * UV_SCALE };
+        f->uv[k] = (Vector2){ u * uv_scale, v * uv_scale };
         if (f->uv[k].x < umin) umin = f->uv[k].x;
         if (f->uv[k].y < vmin) vmin = f->uv[k].y;
     }
@@ -156,7 +156,7 @@ static void flip_face(Face *f) {
 }
 
 /* 선택된 면들을 한 덩어리로 돌출: 선택 영역의 바깥 경계에만 옆면을 만든다 */
-bool obj_extrude_selected_faces(Object *o, float dist) {
+bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale) {
     int nv = o->nverts, nf = o->nfaces;
     int *map = malloc(sizeof(int) * (size_t)(nv + 1));
     Vector3 acc = { 0 };
@@ -200,7 +200,7 @@ bool obj_extrude_selected_faces(Object *o, float dist) {
         for (int k = 0; k < f->n; k++) f->v[k] = map[f->v[k]];
     }
     /* 옆면 uv는 새 위치 기준으로 투영 */
-    for (int i = nf; i < o->nfaces; i++) obj_project_uv(o, &o->faces[i]);
+    for (int i = nf; i < o->nfaces; i++) obj_project_uv(o, &o->faces[i], uv_scale);
     for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
     obj_select_face_verts(o);
     free(map);
@@ -289,7 +289,7 @@ static void add_ring(Object *o, int segs, float y, float r) {
     }
 }
 
-static void build_shape(Object *o, int kind, int color) {
+static void build_shape(Object *o, int kind, Color color) {
     const float h = 0.5f;
     const int segs = 8;
     int ring[MAX_FACE_VERTS];
@@ -384,7 +384,7 @@ static void build_shape(Object *o, int kind, int color) {
     orient_outward(o);
 }
 
-void prim_build(Object *o, int kind, int color, Vector3 up, Vector3 at) {
+void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex) {
     build_shape(o, kind, color);
 
     up = Vector3Normalize(up);
@@ -400,14 +400,15 @@ void prim_build(Object *o, int kind, int color, Vector3 up, Vector3 at) {
     o->origin = at;
 
     /* 면마다 투영한 UV를 텍스처 위에 줄지어 배치(선반 방식)해서 겹치지 않게 */
+    float scale = tex->w / 8.0f;
     float x = 0, y = 0, row = 0;
     for (int i = 0; i < o->nfaces; i++) {
         Face *f = &o->faces[i];
-        obj_project_uv(o, f);
+        obj_project_uv(o, f, scale);
         float w = 0, h = 0;
         for (int k = 0; k < f->n; k++) { w = fmaxf(w, f->uv[k].x); h = fmaxf(h, f->uv[k].y); }
-        if (x + w > TEX_W) { x = 0; y += row; row = 0; }
-        if (y + h > TEX_H) y = 0;
+        if (x + w > tex->w) { x = 0; y += row; row = 0; }
+        if (y + h > tex->h) y = 0;
         for (int k = 0; k < f->n; k++) f->uv[k] = (Vector2){ f->uv[k].x + x, f->uv[k].y + y };
         x += w;
         row = fmaxf(row, h);
@@ -416,14 +417,63 @@ void prim_build(Object *o, int kind, int color, Vector3 up, Vector3 at) {
 
 /* ---- 씬 ---- */
 
+/* ---- 텍스처 버퍼 ---- */
+
+TexBuf *texbuf_new(int w, int h) {
+    TexBuf *t = calloc(1, sizeof(TexBuf) + sizeof(Color) * (size_t)w * (size_t)h);
+    if (!t) { fprintf(stderr, "out of memory\n"); exit(1); }
+    t->refs = 1;
+    t->w = w;
+    t->h = h;
+    return t;
+}
+
+void texbuf_release(TexBuf *t) {
+    if (t && --t->refs == 0) free(t);
+}
+
+static size_t texbuf_bytes(const TexBuf *t) {
+    return t ? sizeof(Color) * (size_t)t->w * (size_t)t->h : 0;
+}
+
+void scene_reset_palette(Scene *s) {
+    memcpy(s->palette, DEFAULT_PALETTE, sizeof DEFAULT_PALETTE);
+    s->npalette = 16;
+    s->bg = DEFAULT_PALETTE[1];
+}
+
 void scene_init(Scene *s) {
     memset(s, 0, sizeof *s);
     s->active = -1;
     scene_reset_palette(s);
     /* 8픽셀 체크무늬: UV 위치가 잘 보이도록 */
-    for (int y = 0; y < TEX_H; y++)
-        for (int x = 0; x < TEX_W; x++)
-            s->tex[y * TEX_W + x] = ((x / 8 + y / 8) & 1) ? 6 : 7;
+    s->tex = texbuf_new(128, 128);
+    for (int y = 0; y < 128; y++)
+        for (int x = 0; x < 128; x++)
+            s->tex->px[y * 128 + x] = DEFAULT_PALETTE[((x / 8 + y / 8) & 1) ? 6 : 7];
+}
+
+float scene_uv_scale(const Scene *s) {
+    return s->tex->w / 8.0f;
+}
+
+Color *scene_tex_mut(Scene *s) {
+    if (s->tex->refs > 1) {
+        TexBuf *t = texbuf_new(s->tex->w, s->tex->h);
+        memcpy(t->px, s->tex->px, texbuf_bytes(t));
+        texbuf_release(s->tex);
+        s->tex = t;
+    }
+    return s->tex->px;
+}
+
+void scene_resize_tex(Scene *s, int w, int h) {
+    TexBuf *t = texbuf_new(w, h);
+    int cw = w < s->tex->w ? w : s->tex->w, ch = h < s->tex->h ? h : s->tex->h;
+    for (int y = 0; y < ch; y++)
+        memcpy(&t->px[y * w], &s->tex->px[y * s->tex->w], sizeof(Color) * (size_t)cw);
+    texbuf_release(s->tex);
+    s->tex = t;
 }
 
 Object *scene_add(Scene *s, const char *name) {
@@ -448,25 +498,48 @@ void scene_clear(Scene *s) {
     s->active = -1;
 }
 
+void scene_release(Scene *s) {
+    scene_clear(s);
+    texbuf_release(s->tex);
+    s->tex = NULL;
+}
+
 void scene_copy(Scene *dst, const Scene *src) {
     memcpy(dst, src, sizeof *dst);
     for (int i = 0; i < src->count; i++) obj_copy(&dst->objs[i], &src->objs[i]);
+    dst->tex->refs++;
 }
 
 /* ---- 되돌리기: 씬 전체 스냅샷. past + future 개수는 항상 UNDO_MAX 이하 ---- */
 
 #define UNDO_MAX 64
+#define UNDO_TEX_BYTES ((size_t)512 << 20)   /* 기록이 붙잡는 텍스처 메모리 상한 */
 static Scene g_past[UNDO_MAX], g_future[UNDO_MAX];
 static int g_npast, g_nfuture;
 
-void undo_push(const Scene *s) {
-    if (g_npast == UNDO_MAX) {
-        scene_clear(&g_past[0]);
-        memmove(&g_past[0], &g_past[1], sizeof(Scene) * (UNDO_MAX - 1));
-        g_npast--;
+static void drop_oldest(void) {
+    scene_release(&g_past[0]);
+    memmove(&g_past[0], &g_past[1], sizeof(Scene) * (size_t)(g_npast - 1));
+    g_npast--;
+}
+
+/* 서로 다른 텍스처 버퍼만 센다 (연속된 기록은 같은 버퍼를 공유하는 경우가 많음) */
+static size_t history_tex_bytes(void) {
+    size_t total = 0;
+    for (int i = 0; i < g_npast; i++) {
+        bool seen = false;
+        for (int j = 0; j < i && !seen; j++) seen = g_past[j].tex == g_past[i].tex;
+        if (!seen) total += texbuf_bytes(g_past[i].tex);
     }
+    return total;
+}
+
+void undo_push(const Scene *s) {
+    if (g_npast == UNDO_MAX) drop_oldest();
     scene_copy(&g_past[g_npast++], s);
-    while (g_nfuture) scene_clear(&g_future[--g_nfuture]);
+    while (g_nfuture) scene_release(&g_future[--g_nfuture]);
+    /* 큰 텍스처를 여러 번 고치면 메모리가 커지므로 오래된 기록부터 버림 */
+    while (g_npast > 1 && history_tex_bytes() > UNDO_TEX_BYTES) drop_oldest();
 }
 
 bool undo_undo(Scene *s) {
@@ -484,6 +557,6 @@ bool undo_redo(Scene *s) {
 }
 
 void undo_reset(void) {
-    while (g_npast) scene_clear(&g_past[--g_npast]);
-    while (g_nfuture) scene_clear(&g_future[--g_nfuture]);
+    while (g_npast) scene_release(&g_past[--g_npast]);
+    while (g_nfuture) scene_release(&g_future[--g_nfuture]);
 }

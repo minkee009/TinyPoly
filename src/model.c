@@ -426,7 +426,8 @@ void model_add_prim(App *a, int kind) {
     char name[32];
     snprintf(name, sizeof name, "%s%d", PRIM_NAMES[kind], s->count + 1);
     Object *o = scene_add(s, name);
-    prim_build(o, kind, a->color, a->add_up, a->add_at);
+    /* 투명한 색으로 만들면 안 보이므로 그땐 흰색 */
+    prim_build(o, kind, a->color.a ? a->color : WHITE, a->add_up, a->add_at, a->scene.tex);
     app_select_mesh(a, s->count - 1);
 }
 
@@ -434,7 +435,7 @@ void model_extrude(App *a) {
     Object *o = app_active(a);
     if (!o || !count_sel_faces(o)) { app_msg(a, "extrude: select faces in the 3d view"); return; }
     app_mark(a);
-    obj_extrude_selected_faces(o, a->grid);
+    obj_extrude_selected_faces(o, a->grid, scene_uv_scale(&a->scene));
 }
 
 void model_delete_faces(App *a) {
@@ -520,7 +521,7 @@ void model_set_face_flag(App *a, int flag, bool on) {
         if (o->faces[i].sel) o->faces[i].flags = on ? (o->faces[i].flags | flag) : (o->faces[i].flags & ~flag);
 }
 
-void model_set_face_color(App *a, int color) {
+void model_set_face_color(App *a, Color color) {
     Object *o = app_active(a);
     if (!o) return;
     app_mark(a);

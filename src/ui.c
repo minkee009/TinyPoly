@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "texture.h"
 #include <raylib.h>
 #include <string.h>
 
@@ -25,10 +26,39 @@ static Color to_color(mu_Color c) {
     return (Color){ c.r, c.g, c.b, c.a };
 }
 
+/* ---- 모서리를 2픽셀 깎은 사각형 (도트 느낌의 둥근 모서리) ---- */
+
+static void mu_round_rect(mu_Context *ctx, mu_Rect r, mu_Color c, bool square_bottom) {
+    if (r.w < 6 || r.h < 6) { mu_draw_rect(ctx, r, c); return; }
+    mu_draw_rect(ctx, mu_rect(r.x + 2, r.y, r.w - 4, r.h), c);
+    mu_draw_rect(ctx, mu_rect(r.x, r.y + 2, r.w, r.h - 4), c);
+    mu_draw_rect(ctx, mu_rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), c);
+    if (square_bottom) mu_draw_rect(ctx, mu_rect(r.x, r.y + r.h - 2, r.w, 2), c);
+}
+
+/* microui의 기본 테두리/배경 대신. 창 제목줄은 아래쪽 모서리를 깎지 않음 (창 몸통과 이어지도록) */
+static void draw_frame(mu_Context *ctx, mu_Rect rect, int colorid) {
+    bool title = colorid == MU_COLOR_TITLEBG;
+    bool bordered = !title && colorid != MU_COLOR_SCROLLBASE && colorid != MU_COLOR_SCROLLTHUMB;
+    mu_Color border = ctx->style->colors[MU_COLOR_BORDER];
+    if (bordered && border.a)
+        mu_round_rect(ctx, mu_rect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2), border, false);
+    mu_round_rect(ctx, rect, ctx->style->colors[colorid], title);
+}
+
+void ui_fill_round(Rectangle r, Color c) {
+    int x = (int)r.x, y = (int)r.y, w = (int)r.width, h = (int)r.height;
+    if (w < 6 || h < 6) { DrawRectangle(x, y, w, h, c); return; }
+    DrawRectangle(x + 2, y, w - 4, h, c);
+    DrawRectangle(x, y + 2, w, h - 4, c);
+    DrawRectangle(x + 1, y + 1, w - 2, h - 2, c);
+}
+
 void ui_init(mu_Context *ctx) {
     mu_init(ctx);
     ctx->text_width = text_width;
     ctx->text_height = text_height;
+    ctx->draw_frame = draw_frame;
     ctx->style->size.y = 16;
     ctx->style->padding = 4;
     ctx->style->spacing = 3;
@@ -250,9 +280,45 @@ static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
         }
 }
 
+/* 색 선택 창의 그라데이션들 (microui 아이콘 명령을 빌려 그리는 순서를 지킴) */
+static void draw_gfx(int id, mu_Rect r, Color c) {
+    int x = r.x, y = r.y, w = r.w, h = r.h;
+    if (id == UI_GFX_SV) {
+        /* 가로: 흰색 → 색상, 세로: 투명 → 검정 */
+        DrawRectangleGradientH(x, y, w, h, WHITE, (Color){ c.r, c.g, c.b, 255 });
+        DrawRectangleGradientV(x, y, w, h, (Color){ 0, 0, 0, 0 }, BLACK);
+    } else if (id == UI_GFX_HUE) {
+        static const Color k[7] = { { 255, 0, 0, 255 }, { 255, 255, 0, 255 }, { 0, 255, 0, 255 }, { 0, 255, 255, 255 },
+                                    { 0, 0, 255, 255 }, { 255, 0, 255, 255 }, { 255, 0, 0, 255 } };
+        for (int i = 0; i < 6; i++) {
+            int y0 = y + h * i / 6, y1 = y + h * (i + 1) / 6;
+            DrawRectangleGradientV(x, y0, w, y1 - y0, k[i], k[i + 1]);
+        }
+    } else if (id == UI_GFX_ALPHA) {
+        for (int i = 0; i * 6 < w; i++)
+            for (int j = 0; j * 6 < h; j++) {
+                int cw = w - i * 6 < 6 ? w - i * 6 : 6, ch = h - j * 6 < 6 ? h - j * 6 : 6;
+                DrawRectangle(x + i * 6, y + j * 6, cw, ch, (i + j) & 1 ? (Color){ 150, 150, 160, 255 } : (Color){ 210, 210, 216, 255 });
+            }
+        DrawRectangleGradientH(x, y, w, h, (Color){ c.r, c.g, c.b, 0 }, (Color){ c.r, c.g, c.b, 255 });
+    } else if (id == UI_GFX_SWATCH) {
+        if (c.a < 255)
+            for (int i = 0; i * 5 < w; i++)
+                for (int j = 0; j * 5 < h; j++) {
+                    int cw = w - i * 5 < 5 ? w - i * 5 : 5, ch = h - j * 5 < 5 ? h - j * 5 : 5;
+                    DrawRectangle(x + i * 5, y + j * 5, cw, ch, (i + j) & 1 ? (Color){ 150, 150, 160, 255 } : (Color){ 210, 210, 216, 255 });
+                }
+        DrawRectangle(x, y, w, h, c);
+    }
+}
+
 static void draw_icon(int id, mu_Rect rect, mu_Color mc) {
     if (id >= UI_ICON_FOLDER && id < UI_ICON_END) {
         draw_pixel_icon(id, rect, to_color(mc));
+        return;
+    }
+    if (id >= UI_GFX_SV && id <= UI_GFX_SWATCH) {
+        draw_gfx(id, rect, to_color(mc));
         return;
     }
     float s  = (rect.w < rect.h ? rect.w : rect.h) * 0.5f;
@@ -383,6 +449,21 @@ bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
     return clicked;
 }
 
+/* 글자 버튼인데 켜진 상태를 강조색으로 보여줌 (형식/출력 고르기 등) */
+bool ui_toggle_button(mu_Context *ctx, const char *label, bool active) {
+    mu_Color saved[3];
+    if (active) {
+        for (int i = 0; i < 3; i++) saved[i] = ctx->style->colors[MU_COLOR_BUTTON + i];
+        ctx->style->colors[MU_COLOR_BUTTON]      = (mu_Color){ 120, 104, 60, 255 };
+        ctx->style->colors[MU_COLOR_BUTTONHOVER] = (mu_Color){ 146, 126, 70, 255 };
+        ctx->style->colors[MU_COLOR_BUTTONFOCUS] = (mu_Color){ 170, 146, 80, 255 };
+    }
+    bool clicked = mu_button_ex(ctx, label, 0, MU_OPT_ALIGNCENTER) != 0;
+    if (active)
+        for (int i = 0; i < 3; i++) ctx->style->colors[MU_COLOR_BUTTON + i] = saved[i];
+    return clicked;
+}
+
 void ui_tooltip_begin(void) {
     g_tip_seen = false;
 }
@@ -399,7 +480,70 @@ void ui_tooltip_draw(void) {
     /* 화면 밖으로 나가지 않게 */
     if (x + w > GetScreenWidth()) x = GetScreenWidth() - w - 2;
     if (y + h > GetScreenHeight()) y = m.y - h - 6;
-    DrawRectangle((int)x, (int)y, (int)w, (int)h, (Color){ 20, 18, 28, 240 });
-    DrawRectangleLines((int)x, (int)y, (int)w, (int)h, (Color){ 255, 200, 60, 255 });
+    ui_fill_round((Rectangle){ x - 1, y - 1, w + 2, h + 2 }, (Color){ 255, 200, 60, 255 });
+    ui_fill_round((Rectangle){ x, y, w, h }, (Color){ 20, 18, 28, 255 });
     DrawTextEx(f, g_tip, (Vector2){ x + 6, y + 4 }, font_size(), (float)UI_FONT_SCALE, (Color){ 240, 236, 228, 255 });
+}
+
+/* ---- raylib로 직접 그리는 버튼 (텍스처 모드 도구줄 등) ---- */
+
+bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked) {
+    Vector2 m = GetMousePosition();
+    bool hover = !blocked && CheckCollisionPointRec(m, r);
+    Color bg = active ? (Color){ 120, 104, 60, 255 } : hover ? (Color){ 84, 80, 108, 255 } : (Color){ 52, 50, 68, 255 };
+    ui_fill_round(r, bg);
+    Vector2 ts = MeasureTextEx(GetFontDefault(), label, font_size(), (float)UI_FONT_SCALE);
+    DrawTextEx(GetFontDefault(), label, (Vector2){ r.x + (r.width - ts.x) / 2, r.y + (r.height - ts.y) / 2 },
+               font_size(), (float)UI_FONT_SCALE, WHITE);
+    return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+/* ---- 색 선택 ---- */
+
+static float clamp01(float v) {
+    return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/* 누르고 있는 동안 rect 안에서의 상대 위치(0~1). 잡고 있지 않으면 false */
+static bool drag_area(mu_Context *ctx, const char *name, mu_Rect r, float *u, float *v) {
+    mu_Id id = mu_get_id(ctx, name, (int)strlen(name));
+    mu_update_control(ctx, id, r, 0);
+    if (ctx->focus != id || !(ctx->mouse_down & MU_MOUSE_LEFT)) return false;
+    *u = clamp01((float)(ctx->mouse_pos.x - r.x) / (float)(r.w - 1));
+    *v = clamp01((float)(ctx->mouse_pos.y - r.y) / (float)(r.h - 1));
+    return true;
+}
+
+static void marker(mu_Context *ctx, int x, int y) {
+    mu_draw_box(ctx, mu_rect(x - 3, y - 3, 7, 7), mu_color(20, 18, 28, 255));
+    mu_draw_box(ctx, mu_rect(x - 2, y - 2, 5, 5), mu_color(255, 255, 255, 255));
+}
+
+bool ui_color_picker(mu_Context *ctx, float *h, float *s, float *v, float *alpha) {
+    bool changed = false;
+    float u, w;
+    Color hue = color_from_hsv(*h, 1, 1, 255);
+
+    mu_layout_row(ctx, 2, (int[]){ 168, 22 }, 168);
+    mu_Rect sv = mu_layout_next(ctx);
+    if (drag_area(ctx, "sv", sv, &u, &w)) { *s = u; *v = 1 - w; changed = true; }
+    mu_draw_icon(ctx, UI_GFX_SV, sv, mu_color(hue.r, hue.g, hue.b, 255));
+    marker(ctx, sv.x + (int)(*s * (sv.w - 1)), sv.y + (int)((1 - *v) * (sv.h - 1)));
+
+    mu_Rect hr = mu_layout_next(ctx);
+    if (drag_area(ctx, "hue", hr, &u, &w)) { *h = w * 359.9f; changed = true; }
+    mu_draw_icon(ctx, UI_GFX_HUE, hr, mu_color(255, 255, 255, 255));
+    marker(ctx, hr.x + hr.w / 2, hr.y + (int)(*h / 360.0f * (hr.h - 1)));
+
+    Color full = color_from_hsv(*h, *s, *v, 255);
+    mu_layout_row(ctx, 1, (int[]){ 193 }, 16);
+    mu_Rect ar = mu_layout_next(ctx);
+    if (drag_area(ctx, "alpha", ar, &u, &w)) { *alpha = u; changed = true; }
+    mu_draw_icon(ctx, UI_GFX_ALPHA, ar, mu_color(full.r, full.g, full.b, 255));
+    marker(ctx, ar.x + (int)(*alpha * (ar.w - 1)), ar.y + ar.h / 2);
+    return changed;
+}
+
+void ui_swatch(mu_Context *ctx, mu_Rect r, Color c) {
+    mu_draw_icon(ctx, UI_GFX_SWATCH, r, mu_color(c.r, c.g, c.b, c.a));
 }

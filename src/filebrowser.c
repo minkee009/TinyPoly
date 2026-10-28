@@ -76,7 +76,8 @@ static void refresh(FileBrowser *fb) {
     for (unsigned i = 0; i < fb->list.count; i++) {
         const char *p = fb->list.paths[i];
         if (base(p)[0] == '.') continue;                       /* 숨김 파일 */
-        if (!is_dir_entry(p) && !IsFileExtension(p, fb->ext)) continue;
+        /* 폴더 고르기 모드(ext가 빈 문자열)면 폴더만 */
+        if (!is_dir_entry(p) && (!fb->ext[0] || !IsFileExtension(p, fb->ext))) continue;
         g_order[g_count++] = (int)i;
     }
     g_sort_list = &fb->list;
@@ -104,7 +105,7 @@ void fb_open(FileBrowser *fb, int action, const char *title, const char *ext, bo
     char p[512];
     snprintf(p, sizeof p, "%s", start ? start : GetWorkingDirectory());
     normalize(p);
-    if (!DirectoryExists(p)) {
+    if (!DirectoryExists(p) || (save && !ext[0])) {   /* 폴더 고르기는 그 폴더 이름을 기본값으로 */
         /* 파일 경로: 폴더는 그 위치, 이름은 저장할 때 기본값으로 */
         if (save) snprintf(fb->name, sizeof fb->name, "%s", base(p));
         parent(p);
@@ -140,6 +141,16 @@ static bool submit(FileBrowser *fb, char *out, size_t size) {
     if (typed[0] == '/' || (typed[0] && typed[1] == ':')) snprintf(full, sizeof full, "%s", typed);
     else join(full, sizeof full, fb->dir, typed);
 
+    if (!fb->ext[0]) {
+        /* 폴더 고르기: 이름이 곧 결과 폴더. 이미 있으면 안의 파일을 덮어쓸지 확인 */
+        if (DirectoryExists(full) && !fb->confirm) {
+            fb->confirm = true;
+            return false;
+        }
+        snprintf(out, size, "%s", full);
+        fb_close(fb);
+        return true;
+    }
     if (DirectoryExists(full)) {
         set_dir(fb, full);
         fb->name[0] = '\0';
@@ -236,12 +247,12 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     if (!done && fb->open) {
         mu_layout_row(ctx, 3, (int[]){ 300, 150, -1 }, 0);
         if (fb->confirm) {
-            mu_label(ctx, "file exists. overwrite?");
+            mu_label(ctx, fb->ext[0] ? "file exists. overwrite?" : "folder exists. overwrite?");
             if (mu_button(ctx, "overwrite")) done = submit(fb, out, size);
             if (mu_button(ctx, "no")) fb->confirm = false;
         } else {
             mu_label(ctx, "");
-            if (mu_button(ctx, fb->save ? "save" : "open")) done = submit(fb, out, size);
+            if (mu_button(ctx, !fb->ext[0] ? "ok" : fb->save ? "save" : "open")) done = submit(fb, out, size);
             if (mu_button(ctx, "cancel")) fb_close(fb);
         }
     }
