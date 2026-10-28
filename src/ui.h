@@ -15,7 +15,7 @@ enum {
     UI_ICON_EYE, UI_ICON_EYE_OFF, UI_ICON_LOCK, UI_ICON_UNLOCK,
     UI_ICON_CLONE, UI_ICON_TRASH, UI_ICON_CLOSE,
     /* 선택에 따른 모델 동작 */
-    UI_ICON_EXTRUDE, UI_ICON_DEL_FACE, UI_ICON_PROPS, UI_ICON_MERGE, UI_ICON_SNAP, UI_ICON_DEL_VERT,
+    UI_ICON_EXTRUDE, UI_ICON_DEL_FACE, UI_ICON_MORE, UI_ICON_MERGE, UI_ICON_SNAP, UI_ICON_DEL_VERT, UI_ICON_CENTER,
     /* 텍스처 도구줄 */
     UI_ICON_UV, UI_ICON_PEN, UI_ICON_PICK, UI_ICON_FILL, UI_ICON_LINE, UI_ICON_RECT, UI_ICON_RECT_FILL,
     UI_ICON_CIRCLE, UI_ICON_CIRCLE_FILL, UI_ICON_SELECT, UI_ICON_GRID, UI_ICON_ZOOM_OUT, UI_ICON_ZOOM_IN, UI_ICON_FIT,
@@ -31,6 +31,8 @@ void ui_render(mu_Context *ctx);
 /* 아이콘 버튼: 잠시 올려두면 tip이 툴팁으로 뜸. active면 눌린 상태로 칠함.
    같은 아이콘을 같은 범위에서 여러 번 쓰면 mu_push_id로 구분할 것 */
 bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active);
+/* 색 칸이 들어간 버튼 (지금 색을 보여주고 누르면 고르기) */
+bool ui_swatch_button(mu_Context *ctx, Color c, const char *tip, bool active);
 /* 켜진 상태를 강조색으로 보여주는 글자 버튼 */
 bool ui_toggle_button(mu_Context *ctx, const char *label, bool active);
 

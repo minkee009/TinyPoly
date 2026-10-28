@@ -334,15 +334,22 @@ static const char *ICON_ART[UI_ICON_END - UI_ICON_FOLDER][10] = {
         "X.......X",
         "XXXXXXXXX",
     },
-    /* 속성: 슬라이더 두 개 */
-    [UI_ICON_PROPS - UI_ICON_FOLDER] = {
-        "..AA.....",
-        "XXAAXXXXX",
-        "..AA.....",
-        ".........",
-        ".....AA..",
-        "XXXXXAAXX",
-        ".....AA..",
+    /* 더 보기: 점 세 개 */
+    [UI_ICON_MORE - UI_ICON_FOLDER] = {
+        "XX..XX..XX",
+        "XX..XX..XX",
+    },
+    /* 원점을 가운데로: 네 모서리 안의 십자 */
+    [UI_ICON_CENTER - UI_ICON_FOLDER] = {
+        "XX.....XX",
+        "X.......X",
+        "....A....",
+        "....A....",
+        "..AAAAA..",
+        "....A....",
+        "....A....",
+        "X.......X",
+        "XX.....XX",
     },
     /* 정점 둘이 하나로 */
     [UI_ICON_MERGE - UI_ICON_FOLDER] = {
@@ -689,6 +696,17 @@ static mu_Id g_tip_id;
 static double g_tip_since;
 static bool g_tip_seen;
 
+/* 마우스가 id 위에 머물면 tip을 툴팁으로 */
+static void track_tip(mu_Context *ctx, mu_Id id, const char *tip) {
+    if (!tip || ctx->hover != id) return;
+    if (g_tip_id != id) {
+        g_tip_id = id;
+        g_tip_since = GetTime();
+    }
+    g_tip = tip;
+    g_tip_seen = true;
+}
+
 bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
     /* 켜진 상태는 버튼 색을 강조색 쪽으로 바꿔서 그림 */
     mu_Color saved[3];
@@ -702,15 +720,18 @@ bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
     if (active)
         for (int i = 0; i < 3; i++) ctx->style->colors[MU_COLOR_BUTTON + i] = saved[i];
 
-    mu_Id id = ctx->last_id;
-    if (tip && ctx->hover == id) {
-        if (g_tip_id != id) {
-            g_tip_id = id;
-            g_tip_since = GetTime();
-        }
-        g_tip = tip;
-        g_tip_seen = true;
-    }
+    track_tip(ctx, ctx->last_id, tip);
+    return clicked;
+}
+
+bool ui_swatch_button(mu_Context *ctx, Color c, const char *tip, bool active) {
+    mu_Id id = mu_get_id(ctx, tip, (int)strlen(tip));
+    mu_Rect r = mu_layout_next(ctx);
+    mu_update_control(ctx, id, r, 0);
+    bool clicked = ctx->mouse_pressed == MU_MOUSE_LEFT && ctx->focus == id;
+    ctx->draw_frame(ctx, r, active ? MU_COLOR_BUTTONFOCUS : ctx->hover == id ? MU_COLOR_BUTTONHOVER : MU_COLOR_BUTTON);
+    ui_swatch(ctx, mu_rect(r.x + 7, r.y + 4, r.w - 14, r.h - 8), c);
+    track_tip(ctx, id, tip);
     return clicked;
 }
 
