@@ -6,7 +6,7 @@
 
 **A tiny, lightweight low-poly 3D modeler + pixel texture painter**
 
-Build meshes by clicking and dragging in four views, paint textures up to 1024×1024 by hand,<br>
+Build meshes by clicking and dragging in four views, paint 128×128 pixel textures by hand (up to 1024×1024),<br>
 and export to OBJ / glTF / GLB.
 
 ![version](https://img.shields.io/badge/version-0.5.4-f8c040)
