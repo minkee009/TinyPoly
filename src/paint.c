@@ -792,7 +792,7 @@ void paint_draw(App *a) {
     DrawRectangleLinesEx((Rectangle){ tr.x - 1, tr.y - 1, tr.width + 2, tr.height + 2 }, 1, (Color){ 90, 86, 110, 255 });
 
     /* UV: 어떤 텍스처 위에서도 보이게 어두운 테두리 + 밝은 선 (테두리를 먼저 다 그려야 이음새가 안 덮임).
-       선택된 면은 영역을 옅게 칠하고 노란 선 + 꼭짓점 */
+       선택된 면은 노란 선, UV 도구면 영역을 옅게 칠하고 꼭짓점도 */
     Object *ob = app_active(a);
     if (ob) {
         const Color dark = { 16, 14, 24, 220 };
@@ -804,7 +804,7 @@ void paint_draw(App *a) {
                     const Face *f = &ob->faces[i];
                     if (f->sel != (pass == 1) || (f->flags & FACE_NOTEX)) continue;
                     if (layer == 0) {
-                        if (!pass) continue;
+                        if (!pass || a->tool != TOOL_UV) continue;
                         /* 볼록 다각형 부채꼴. 감김 방향을 몰라서 양쪽 다 (뒷면은 걸러짐) */
                         Vector2 p0 = tex_to_screen(a, f->uv[0]);
                         for (int k = 1; k + 1 < f->n; k++) {

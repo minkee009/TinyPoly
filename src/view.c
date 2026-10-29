@@ -299,8 +299,11 @@ static void draw_meshes(App *a) {
 
                         /* 텍스처 면은 흰색에 음영만 곱함 */
                         Color c = shade_color(textured ? WHITE : f->color, level);
-                        /* 텍스처 모드는 칠한 색을 그대로 보이게 덧칠 없이 테두리만 */
-                        if (f->sel && i == s->active && a->mode == MODE_MODEL) c = ColorLerp(c, SEL_COLOR, 0.3f);
+                        /* 텍스처 모드는 UV 도구일 때만 옅게, 그리기 도구는 칠한 색이 그대로 보이게 테두리만 */
+                        if (f->sel && i == s->active) {
+                            if (a->mode == MODE_MODEL) c = ColorLerp(c, SEL_COLOR, 0.3f);
+                            else if (a->tool == TOOL_UV) c = ColorLerp(c, SEL_COLOR, 0.15f);
+                        }
                         if (i == a->hover_obj && k == a->hover_face) c = ColorLerp(c, HOVER_COLOR, 0.4f);
                         rlColor4ub(c.r, c.g, c.b, 255);
                         for (int j = 1; j + 1 < f->n; j++) {
