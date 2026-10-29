@@ -458,8 +458,11 @@ void model_delete_verts(App *a) {
 
 void model_delete_mesh(App *a) {
     if (a->scene.active < 0) return;
+    char name[sizeof a->scene.objs[0].name];
+    snprintf(name, sizeof name, "%s", a->scene.objs[a->scene.active].name);
     app_mark(a);
     scene_delete(&a->scene, a->scene.active);
+    app_msg(a, "deleted %s (ctrl+z to undo)", name);
 }
 
 void model_merge(App *a) {

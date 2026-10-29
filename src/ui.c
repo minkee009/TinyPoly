@@ -1,6 +1,9 @@
 #include "ui.h"
 #include "texture.h"
 #include <raylib.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static float font_size(void) {
@@ -676,8 +679,15 @@ void ui_input(mu_Context *ctx) {
         if (IsKeyPressed(keys[i].rl))  mu_input_keydown(ctx, keys[i].mu);
         if (IsKeyReleased(keys[i].rl)) mu_input_keyup(ctx, keys[i].mu);
     }
-    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) mu_input_keydown(ctx, MU_KEY_BACKSPACE);
-    if (IsKeyReleased(KEY_BACKSPACE)) mu_input_keyup(ctx, MU_KEY_BACKSPACE);
+    /* 누르고 있으면 반복되는 키 */
+    static const struct { int rl; int mu; } repeat_keys[] = {
+        { KEY_BACKSPACE, MU_KEY_BACKSPACE }, { KEY_DELETE, UI_KEY_DELETE },
+        { KEY_LEFT, UI_KEY_LEFT }, { KEY_RIGHT, UI_KEY_RIGHT }, { KEY_HOME, UI_KEY_HOME }, { KEY_END, UI_KEY_END },
+    };
+    for (size_t i = 0; i < sizeof repeat_keys / sizeof repeat_keys[0]; i++) {
+        if (IsKeyPressed(repeat_keys[i].rl) || IsKeyPressedRepeat(repeat_keys[i].rl)) mu_input_keydown(ctx, repeat_keys[i].mu);
+        if (IsKeyReleased(repeat_keys[i].rl)) mu_input_keyup(ctx, repeat_keys[i].mu);
+    }
 
     int cp;
     while ((cp = GetCharPressed()) > 0) {
@@ -687,6 +697,249 @@ void ui_input(mu_Context *ctx) {
         memcpy(buf, utf8, (size_t)len);
         mu_input_text(ctx, buf);
     }
+}
+
+/* ---- 글자 입력칸 ---- */
+
+/* 입력 중인 칸 하나의 상태 (한 번에 하나만 입력하므로 전역 하나) */
+static mu_Id g_edit_id;
+static int g_caret;          /* buf 안의 바이트 위치 (utf-8 글자 경계) */
+static int g_anchor;         /* 선택의 다른 끝. caret과 같으면 선택 없음 */
+static int g_scroll;         /* 글자가 칸보다 길 때 왼쪽으로 민 픽셀 */
+static double g_blink_from;  /* 이때부터 깜빡임을 다시 셈 (움직이면 바로 보이게) */
+static bool g_drag;          /* 이 칸에서 누른 채 끌고 있음 */
+static bool g_drag_wait;     /* 처음 누른 클릭: 끌기 전까지는 caret을 끝에 둠 */
+static int g_press_x;
+static int g_clicks;         /* 연달아 누른 횟수: 2면 단어, 3이면 전체 선택 */
+static double g_click_time;
+
+static bool utf8_cont(char c) { return (c & 0xc0) == 0x80; }
+
+static int caret_prev(const char *buf, int i) {
+    if (i > 0) i--;
+    while (i > 0 && utf8_cont(buf[i])) i--;
+    return i;
+}
+
+static int caret_next(const char *buf, int i) {
+    if (buf[i]) i++;
+    while (buf[i] && utf8_cont(buf[i])) i++;
+    return i;
+}
+
+/* x(글자 시작 기준 픽셀)에 가장 가까운 글자 경계 */
+static int caret_at_x(mu_Context *ctx, const char *buf, int x) {
+    int best = 0, best_d = x < 0 ? -x : x;
+    for (int i = caret_next(buf, 0); i > 0; i = caret_next(buf, i)) {
+        int d = ctx->text_width(ctx->style->font, buf, i) - x;
+        if (d < 0) d = -d;
+        if (d < best_d) { best = i; best_d = d; }
+        if (!buf[i]) break;
+    }
+    return best;
+}
+
+/* x(글자 시작 기준 픽셀) 아래에 있는 글자의 시작. 글이 비었으면 0 */
+static int char_at_x(mu_Context *ctx, const char *buf, int x) {
+    int i = 0;
+    while (buf[i]) {
+        int next = caret_next(buf, i);
+        if (x < ctx->text_width(ctx->style->font, buf, next) || !buf[next]) break;
+        i = next;
+    }
+    return i;
+}
+
+/* 단어 글자: 영문·숫자·_ 와 한글 같은 비ASCII. 나머지(. - 공백 등)는 구분 글자 */
+static bool word_char(char c) {
+    return isalnum((unsigned char)c) || c == '_' || (unsigned char)c >= 0x80;
+}
+
+/* i 자리 글자가 속한 단어를 선택. 구분 글자면 그 한 글자만 */
+static void select_word(const char *buf, int i) {
+    if (!buf[i]) { g_caret = g_anchor = i; return; }
+    int lo = i, hi = caret_next(buf, i);
+    if (word_char(buf[i])) {
+        while (lo > 0 && word_char(buf[lo - 1])) lo--;
+        while (buf[hi] && word_char(buf[hi])) hi++;
+    }
+    g_anchor = lo;
+    g_caret = hi;
+}
+
+/* 선택한 글자를 지우고 caret을 그 자리로. 지웠으면 true */
+static bool delete_selection(char *buf) {
+    int lo = mu_min(g_caret, g_anchor), hi = mu_max(g_caret, g_anchor);
+    if (lo == hi) return false;
+    memmove(buf + lo, buf + hi, strlen(buf + hi) + 1);
+    g_caret = g_anchor = lo;
+    return true;
+}
+
+/* caret 자리에 글자 넣기. 칸이 모자라면 글자 단위로 자름. 넣었으면 true */
+static bool insert_text(char *buf, int bufsz, const char *text) {
+    int len = (int)strlen(buf), n = (int)strlen(text);
+    if (n > bufsz - len - 1) {
+        n = bufsz - len - 1;
+        while (n > 0 && utf8_cont(text[n])) n--;
+    }
+    if (n <= 0) return false;
+    memmove(buf + g_caret + n, buf + g_caret, (size_t)(len - g_caret + 1));
+    memcpy(buf + g_caret, text, (size_t)n);
+    g_caret += n;
+    g_anchor = g_caret;
+    return true;
+}
+
+int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
+    mu_Id id = mu_get_id(ctx, &buf, sizeof buf);
+    mu_Rect r = mu_layout_next(ctx);
+    mu_Font font = ctx->style->font;
+    int pad = ctx->style->padding;
+    bool had_focus = ctx->focus == id;
+    int res = 0;
+    mu_update_control(ctx, id, r, MU_OPT_HOLDFOCUS);
+
+    if (ctx->focus == id) {
+        int len = (int)strlen(buf);
+        bool shift = ctx->key_down & MU_KEY_SHIFT, ctrl = ctx->key_down & MU_KEY_CTRL;
+        int org = r.x + pad - g_scroll;   /* 글자 시작 x */
+        /* 새로 입력을 시작하면 caret은 끝에 */
+        if (g_edit_id != id) {
+            g_edit_id = id;
+            g_caret = g_anchor = len;
+            g_scroll = 0;
+            g_drag = false;
+            g_clicks = 0;
+            g_blink_from = GetTime();
+        }
+        g_caret = mu_min(g_caret, len);
+        g_anchor = mu_min(g_anchor, len);
+
+        /* 마우스: 누른 곳부터 끈 곳까지 선택. 처음 누른 클릭은 끌 때만 */
+        if (ctx->mouse_pressed == MU_MOUSE_LEFT && mu_mouse_over(ctx, r)) {
+            /* 같은 자리를 빨리 다시 누르면 연달아 누른 것으로 셈 */
+            double now = GetTime();
+            bool again = now - g_click_time < 0.4 && abs(ctx->mouse_pos.x - g_press_x) <= 4;
+            g_clicks = again ? g_clicks + 1 : 1;
+            g_click_time = now;
+            g_drag = true;
+            g_drag_wait = !had_focus;
+            g_press_x = ctx->mouse_pos.x;
+            if (g_clicks >= 3) {
+                g_anchor = 0;
+                g_caret = len;
+                g_drag = false;
+            } else if (g_clicks == 2) {
+                select_word(buf, char_at_x(ctx, buf, ctx->mouse_pos.x - org));
+                g_drag = false;
+            } else if (had_focus) {
+                g_caret = caret_at_x(ctx, buf, ctx->mouse_pos.x - org);
+                if (!shift) g_anchor = g_caret;
+            }
+        }
+        if (g_drag) {
+            if (!(ctx->mouse_down & MU_MOUSE_LEFT)) g_drag = false;
+            else {
+                if (g_drag_wait && abs(ctx->mouse_pos.x - g_press_x) > 3) {
+                    g_anchor = caret_at_x(ctx, buf, g_press_x - org);
+                    g_drag_wait = false;
+                }
+                if (!g_drag_wait) g_caret = caret_at_x(ctx, buf, ctx->mouse_pos.x - org);
+            }
+            g_blink_from = GetTime();
+        }
+
+        /* 이동 키: shift면 선택을 늘림, 아니면 선택을 접고 이동 */
+        int dir = (ctx->key_pressed & UI_KEY_RIGHT ? 1 : 0) - (ctx->key_pressed & UI_KEY_LEFT ? 1 : 0);
+        if (dir) {
+            if (!shift && g_caret != g_anchor) g_caret = dir < 0 ? mu_min(g_caret, g_anchor) : mu_max(g_caret, g_anchor);
+            else g_caret = dir < 0 ? caret_prev(buf, g_caret) : caret_next(buf, g_caret);
+        }
+        if (ctx->key_pressed & UI_KEY_HOME) g_caret = 0;
+        if (ctx->key_pressed & UI_KEY_END)  g_caret = len;
+        if (ctx->key_pressed & (UI_KEY_LEFT | UI_KEY_RIGHT | UI_KEY_HOME | UI_KEY_END)) {
+            if (!shift) g_anchor = g_caret;
+            g_blink_from = GetTime();
+        }
+
+        /* ctrl+A 전체 선택, C 복사, X 잘라내기, V 붙여넣기 */
+        if (ctrl && IsKeyPressed(KEY_A)) { g_anchor = 0; g_caret = len; }
+        if (ctrl && (IsKeyPressed(KEY_C) || IsKeyPressed(KEY_X)) && g_caret != g_anchor) {
+            int lo = mu_min(g_caret, g_anchor), hi = mu_max(g_caret, g_anchor);
+            char clip[1024];
+            snprintf(clip, sizeof clip, "%.*s", hi - lo, buf + lo);
+            SetClipboardText(clip);
+            if (IsKeyPressed(KEY_X) && delete_selection(buf)) res |= MU_RES_CHANGE;
+        }
+        if (ctrl && IsKeyPressed(KEY_V)) {
+            const char *clip = GetClipboardText();
+            char line[1024] = "";
+            /* 첫 줄만, 제어 문자 없이 */
+            int k = 0;
+            for (; clip && clip[k] && clip[k] != '\n' && clip[k] != '\r' && k < (int)sizeof line - 1; k++)
+                line[k] = (unsigned char)clip[k] < 32 ? ' ' : clip[k];
+            line[k] = '\0';
+            if (line[0]) {
+                delete_selection(buf);
+                insert_text(buf, bufsz, line);
+                res |= MU_RES_CHANGE;
+            }
+        }
+
+        /* 타이핑: 선택한 글자를 바꿔 넣음 */
+        if (ctx->input_text[0]) {
+            bool del = delete_selection(buf);
+            if (insert_text(buf, bufsz, ctx->input_text) || del) res |= MU_RES_CHANGE;
+            g_blink_from = GetTime();
+        }
+        /* 지우기: 선택이 있으면 선택, 없으면 caret 앞 글자 하나 */
+        if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+            if (g_caret == g_anchor) g_anchor = caret_prev(buf, g_caret);
+            if (delete_selection(buf)) res |= MU_RES_CHANGE;
+            g_blink_from = GetTime();
+        }
+        /* Delete: 선택이 있으면 선택, 없으면 caret 뒤 글자 하나 */
+        if (ctx->key_pressed & UI_KEY_DELETE) {
+            if (g_caret == g_anchor) g_anchor = caret_next(buf, g_caret);
+            if (delete_selection(buf)) res |= MU_RES_CHANGE;
+            g_blink_from = GetTime();
+        }
+        if (ctx->key_pressed & MU_KEY_RETURN) {
+            mu_set_focus(ctx, 0);
+            res |= MU_RES_SUBMIT;
+        }
+    } else if (g_edit_id == id) {
+        g_edit_id = 0;
+    }
+
+    mu_draw_control_frame(ctx, id, r, MU_COLOR_BASE, 0);
+    if (ctx->focus == id) {
+        mu_Color color = ctx->style->colors[MU_COLOR_TEXT];
+        int avail = r.w - pad * 2 - 1;
+        int textw = ctx->text_width(font, buf, -1);
+        int caretx = ctx->text_width(font, buf, g_caret);
+        /* caret이 보이게 밀고, 끝 뒤로 빈자리가 생기면 당겨옴 */
+        if (caretx - g_scroll > avail) g_scroll = caretx - avail;
+        if (caretx - g_scroll < 0) g_scroll = caretx;
+        if (g_scroll > 0 && textw - g_scroll < avail) g_scroll = mu_max(0, textw - avail);
+        int textx = r.x + pad - g_scroll;
+        int texth = ctx->text_height(font);
+        int texty = r.y + (r.h - texth) / 2;
+        mu_push_clip_rect(ctx, r);
+        if (g_caret != g_anchor) {
+            int ax = ctx->text_width(font, buf, g_anchor);
+            int x0 = mu_min(ax, caretx), x1 = mu_max(ax, caretx);
+            mu_draw_rect(ctx, mu_rect(textx + x0, texty - 1, x1 - x0, texth + 2), ctx->style->colors[MU_COLOR_BUTTONFOCUS]);
+        }
+        mu_draw_text(ctx, font, buf, -1, mu_vec2(textx, texty), color);
+        double t = GetTime() - g_blink_from;
+        if (t - (double)(long)t < 0.5) mu_draw_rect(ctx, mu_rect(textx + caretx, texty, 1, texth), color);
+        mu_pop_clip_rect(ctx);
+    } else {
+        mu_draw_control_text(ctx, buf, r, MU_COLOR_TEXT, 0);
+    }
+    return res;
 }
 
 /* ---- 아이콘 버튼 + 툴팁 ---- */

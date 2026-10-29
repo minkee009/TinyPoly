@@ -9,7 +9,7 @@
 Build meshes by clicking and dragging in four views, paint textures up to 1024×1024 by hand,<br>
 and export to OBJ / glTF / GLB.
 
-![version](https://img.shields.io/badge/version-0.5.3-f8c040)
+![version](https://img.shields.io/badge/version-0.5.4-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -28,12 +28,13 @@ and export to OBJ / glTF / GLB.
 - **Click & drag editing**: drag a mesh or vertex to move it, `R`+drag to rotate, `T`+drag to scale, hold `Shift` while dragging to move the origin, `Ctrl` inverts grid snapping
 - **Box select**: drag on empty space in the 2D views, `Ctrl`+drag in the 3D view (`Shift` adds to the selection)
 - **Editing**: extrude faces, delete faces/vertices, merge and snap vertices, mirror, clone, copy/paste meshes
-- **Selection bar**: select faces or vertices and a small bar appears at the bottom of the views, showing how many are selected and what you can do with them
+- **Selection bar**: select faces, vertices or a whole mesh and a small bar appears at the bottom of the views, showing what is selected and what you can do with it
   - faces: extrude, delete │ face color, options
   - vertices: merge, snap to grid, delete (merge is greyed out until 2+ vertices are selected)
+  - mesh: center origin, clone, delete
 - **Right-click menus**: the menu depends on what is under the cursor (vertex / face / mesh / empty space) and its title tells you which one it is
 - **Face properties (`F`)**: color, double-sided, shading, textured, draw behind
-- **Project window (`O`)**: hide (eye), lock (padlock), rename (double-click), center origin, clone, delete
+- **Project window (`O`)**: hide (eye), lock (padlock), rename (double-click), delete (trash) on each row, `+` to add a mesh, right-click a name for the mesh menu (rename, center origin, mirror, clone, copy, delete)
 - 3-step flat shading, transparent pixels, textured / color / wireframe render (`M`), shading toggle (`L`)
 
 ### Texture
@@ -72,6 +73,7 @@ Colors of untextured faces are stored in a strip at the bottom of the texture PN
 - Pixel-art icons everywhere. Hover for a moment to see the name and shortcut as a tooltip
 - Pixel-rounded windows with a close button in the title bar, and a resize grip on resizable ones
 - Short notifications (saved, errors) pop up in the bottom-left corner and fade out
+- Text fields: blinking caret, `←` `→` `Home` `End` to move it (`Shift` selects), drag to select, double-click selects a word and triple-click everything, `Ctrl+A/C/X/V`
 
 ### Pixel cursors
 ![Cursors](docs/cursors.png)

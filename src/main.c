@@ -204,17 +204,25 @@ static void face_flag_checkbox(App *a, const char *label, int flag, bool inverte
     Face *f = first_selected_face(a);
     if (!f) return;
     int on = ((f->flags & flag) != 0) != inverted;
-    if (mu_checkbox(a->ui, label, &on) & MU_RES_CHANGE) model_set_face_flag(a, flag, inverted ? !on : on);
+    /* mu_checkbox는 &on 주소로 id를 만드는데 네 칸 모두 같은 주소라 flag로 구분 */
+    mu_push_id(a->ui, &flag, sizeof flag);
+    int res = mu_checkbox(a->ui, label, &on);
+    mu_pop_id(a->ui);
+    if (res & MU_RES_CHANGE) model_set_face_flag(a, flag, inverted ? !on : on);
 }
 
 /* 활성 메쉬의 원점(회전·크기 기준점)을 정점들의 가운데로 */
 static void center_origin(App *a) {
-    if (!app_active(a)) return;
-    app_mark(a);
     Object *o = app_active(a);
+    if (!o || !o->nverts) { app_msg(a, "center origin: no mesh selected"); return; }
     Vector3 mn = { 1e9f, 1e9f, 1e9f }, mx = { -1e9f, -1e9f, -1e9f };
     for (int i = 0; i < o->nverts; i++) { mn = Vector3Min(mn, o->verts[i].p); mx = Vector3Max(mx, o->verts[i].p); }
-    if (o->nverts) o->origin = Vector3Scale(Vector3Add(mn, mx), 0.5f);
+    Vector3 c = Vector3Scale(Vector3Add(mn, mx), 0.5f);
+    if (Vector3Distance(c, o->origin) < 1e-4f) { app_msg(a, "origin already centered"); return; }
+    app_mark(a);
+    o = app_active(a);
+    o->origin = c;
+    app_msg(a, "origin centered (%g, %g, %g)", c.x, c.y, c.z);
 }
 
 /* 활성 메쉬에서 골라진 면(faces) 또는 정점 개수 */
@@ -285,7 +293,10 @@ static void menu_body(App *a, int width) {
             if (menu_button(ctx, "face props (F)"))  a->menu = MENU_FACEPROPS;
         } else {
             if (menu_button(ctx, "mesh props (G)"))  a->menu = MENU_MESHPROPS;
+            if (menu_button(ctx, "center origin"))   { center_origin(a); close_popup(ctx); }
         }
+        /* 메쉬 이름 바꾸기: 이름 칸은 project 창에 있으므로 창도 연다 */
+        if (menu_button(ctx, "rename mesh"))         { a->rename_idx = a->scene.active; a->show_overview = 1; close_popup(ctx); }
         mu_label(ctx, "mirror");
         mu_layout_row(ctx, 3, w3, 0);
         if (menu_button(ctx, "x")) { model_mirror(a, 0); close_popup(ctx); }
@@ -328,7 +339,7 @@ static void menu_body(App *a, int width) {
         if (!o) { close_popup(ctx); break; }
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "name");
-        mu_textbox(ctx, o->name, sizeof o->name);
+        ui_textbox(ctx, o->name, sizeof o->name);
         int hidden = o->hidden, locked = o->locked;
         if (mu_checkbox(ctx, "hidden", &hidden) & MU_RES_CHANGE) { app_mark(a); o = app_active(a); o->hidden = hidden; }
         if (mu_checkbox(ctx, "locked", &locked) & MU_RES_CHANGE) { app_mark(a); o = app_active(a); o->locked = locked; }
@@ -431,19 +442,20 @@ static void draw_topbar(App *a) {
     mu_end_window(ctx);
 }
 
-/* 면·정점을 고르면 뷰 아래쪽 가운데에 뜨는 작은 막대.
+/* 면·정점(또는 메쉬만)을 고르면 뷰 아래쪽 가운데에 뜨는 작은 막대.
    왼쪽은 무엇을 골랐는지, 그다음 동작, 구분선 뒤는 설정 (우클릭 메뉴와 같은 기능) */
 static int g_bar_top;   /* 선택 막대의 위쪽 y (막대에서 연 팝업을 그 위에 띄움) */
 
 static void draw_selection_bar(App *a) {
     mu_Context *ctx = a->ui;
     Object *o = app_active(a);
-    int nf = o ? count_sel(o, true) : 0, nv = o ? count_sel(o, false) : 0;
-    if (!nf && !nv) return;
+    if (!o) return;
+    int nf = count_sel(o, true), nv = count_sel(o, false);
 
     char label[32];
     if (nf) snprintf(label, sizeof label, "%d %s", nf, nf == 1 ? "face" : "faces");
-    else snprintf(label, sizeof label, "%d %s", nv, nv == 1 ? "vertex" : "vertices");
+    else if (nv) snprintf(label, sizeof label, "%d %s", nv, nv == 1 ? "vertex" : "vertices");
+    else snprintf(label, sizeof label, "%.16s", o->name);
     const int B = 34, SEP = 9, L = ctx->text_width(NULL, label, -1) + 14;
     const int sp = ctx->style->spacing, pad = ctx->style->padding;
     int w = nf ? L + B * 4 + SEP + sp * 5 : L + B * 3 + sp * 3;
@@ -467,7 +479,7 @@ static void draw_selection_bar(App *a) {
             app_open_menu(a, MENU_FACECOLOR);
         if (ui_icon_button(ctx, UI_ICON_MORE, "face options: double sided, shading... (F)", a->menu == MENU_FACEOPTS))
             app_open_menu(a, MENU_FACEOPTS);
-    } else {
+    } else if (nv) {
         mu_layout_row(ctx, 4, (int[]){ L, B, B, B }, 22);
         mu_label(ctx, label);
         if (nv < 2) ui_push_disabled(ctx);
@@ -476,6 +488,12 @@ static void draw_selection_bar(App *a) {
         else if (merge) model_merge(a);
         if (ui_icon_button(ctx, UI_ICON_SNAP, "snap to grid", false)) model_snap(a);
         if (ui_icon_button(ctx, UI_ICON_DEL_VERT, "delete vertex (del)", false)) model_delete_verts(a);
+    } else {
+        mu_layout_row(ctx, 4, (int[]){ L, B, B, B }, 22);
+        mu_label(ctx, label);
+        if (ui_icon_button(ctx, UI_ICON_CENTER, "center origin", false)) center_origin(a);
+        if (ui_icon_button(ctx, UI_ICON_CLONE, "clone mesh", false)) model_clone(a);
+        if (ui_icon_button(ctx, UI_ICON_TRASH, "delete mesh (ctrl+x)", false)) model_delete_mesh(a);
     }
     mu_end_window(ctx);
 }
@@ -490,10 +508,11 @@ static void draw_overview(App *a) {
     Scene *s = &a->scene;
     static double last_click;
     static int last_idx = -1;
+    int del_idx = -1;   /* 목록을 다 그린 뒤에 지움 */
     for (int i = 0; i < s->count; i++) {
         Object *o = &s->objs[i];
         mu_push_id(ctx, &i, sizeof i);
-        mu_layout_row(ctx, 3, (int[]){ 30, 30, -1 }, 0);
+        mu_layout_row(ctx, 4, (int[]){ 30, 30, -34, -1 }, 0);
         if (ui_icon_button(ctx, o->hidden ? UI_ICON_EYE_OFF : UI_ICON_EYE,
                            o->hidden ? "hidden (click to show)" : "visible (click to hide)", false)) {
             app_mark(a);
@@ -507,7 +526,7 @@ static void draw_overview(App *a) {
         }
         o = &s->objs[i];
         if (a->rename_idx == i) {
-            if (mu_textbox(ctx, o->name, sizeof o->name) & MU_RES_SUBMIT) a->rename_idx = -1;
+            if (ui_textbox(ctx, o->name, sizeof o->name) & MU_RES_SUBMIT) a->rename_idx = -1;
         } else {
             char label[48];
             snprintf(label, sizeof label, i == s->active ? "> %s" : "%s", o->name);
@@ -518,16 +537,26 @@ static void draw_overview(App *a) {
                 last_click = GetTime();
                 app_select_mesh(a, i);
             }
+            /* 우클릭: 그 메쉬를 고르고 메쉬 메뉴 */
+            if (ctx->mouse_pressed == MU_MOUSE_RIGHT && mu_mouse_over(ctx, ctx->last_rect)) {
+                if (i != s->active) app_select_mesh(a, i);
+                app_open_menu(a, MENU_MESH);
+            }
         }
+        if (ui_icon_button(ctx, UI_ICON_TRASH, "delete mesh", false)) del_idx = i;
         mu_pop_id(ctx);
     }
-    /* 선택한 메쉬: 원점 가운데로 / 복제 / 삭제 */
-    mu_layout_row(ctx, 3, (int[]){ 34, 34, 34 }, 0);
-    if (ui_icon_button(ctx, UI_ICON_CENTER, "center origin of selected mesh", false)) center_origin(a);
-    if (ui_icon_button(ctx, UI_ICON_CLONE, "clone selected mesh", false)) model_clone(a);
-    if (ui_icon_button(ctx, UI_ICON_TRASH, "delete selected mesh (ctrl+x)", false)) model_delete_mesh(a);
+    if (del_idx >= 0) {
+        if (del_idx != s->active) app_select_mesh(a, del_idx);
+        a->rename_idx = -1;
+        model_delete_mesh(a);
+    }
     mu_layout_row(ctx, 1, (int[]){ -1 }, 0);
-    mu_label(ctx, "double-click: rename");
+    if (ui_icon_button(ctx, UI_ICON_PLUS, "add mesh", a->menu == MENU_ADD)) {
+        a->add_at = (Vector3){ 0 };
+        a->add_up = (Vector3){ 0, 1, 0 };
+        app_open_menu(a, MENU_ADD);
+    }
     ui_end_window(ctx);
 }
 
@@ -571,7 +600,7 @@ static void draw_color_window(App *a) {
     if (!hex_active) snprintf(hex, sizeof hex, "%02X%02X%02X%02X", target->r, target->g, target->b, target->a);
     mu_layout_row(ctx, 2, (int[]){ 40, -1 }, 24);
     ui_swatch(ctx, mu_layout_next(ctx), *target);
-    int res = mu_textbox(ctx, hex, sizeof hex);
+    int res = ui_textbox(ctx, hex, sizeof hex);
     hex_active = ctx->focus == ctx->last_id;
     if (res & MU_RES_CHANGE) {
         unsigned int r, g, b, al8 = 255;

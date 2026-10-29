@@ -245,7 +245,7 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     if (!done && fb->open) {
         mu_layout_row(ctx, 2, (int[]){ 60, -1 }, 0);
         mu_label(ctx, "name");
-        int res = mu_textbox(ctx, fb->name, sizeof fb->name);
+        int res = ui_textbox(ctx, fb->name, sizeof fb->name);
         if (res & MU_RES_CHANGE) fb->confirm = false;     /* 이름을 고치면 덮어쓰기 확인 해제 */
         if (res & MU_RES_SUBMIT) done = submit(fb, out, size);
     }

@@ -24,6 +24,9 @@ enum {
     UI_GFX_SV = UI_ICON_END, UI_GFX_HUE, UI_GFX_ALPHA, UI_GFX_SWATCH,
 };
 
+/* microui에 없는 키 (MU_KEY_* 다음 비트) */
+enum { UI_KEY_LEFT = 1 << 5, UI_KEY_RIGHT = 1 << 6, UI_KEY_HOME = 1 << 7, UI_KEY_END = 1 << 8, UI_KEY_DELETE = 1 << 9 };
+
 void ui_init(mu_Context *ctx);
 void ui_input(mu_Context *ctx);
 void ui_render(mu_Context *ctx);
@@ -55,6 +58,11 @@ void ui_end_window(mu_Context *ctx);
 bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked);
 /* 같은 방식의 아이콘 버튼 (툴팁 포함) */
 bool ui_icon_button_rect(Rectangle r, int icon, const char *tip, bool active, bool blocked);
+
+/* 글자 입력칸 (mu_textbox 대신): caret이 깜빡이고, 좌우·Home·End 키와 다시 클릭으로 caret을 옮김.
+   끌거나 shift+이동 키로 범위 선택, 더블클릭은 단어·세 번은 전체 선택, ctrl+A/C/X/V.
+   반환은 mu_textbox와 같음 (MU_RES_CHANGE, MU_RES_SUBMIT) */
+int ui_textbox(mu_Context *ctx, char *buf, int bufsz);
 
 /* 색 선택: 채도/명도 사각형 + 색상 막대 + 알파 막대. 바뀌면 true (h: 0~360, 나머지 0~1) */
 bool ui_color_picker(mu_Context *ctx, float *h, float *s, float *v, float *alpha);
