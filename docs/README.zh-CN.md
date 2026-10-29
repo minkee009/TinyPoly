@@ -9,7 +9,7 @@
 在四分视图中点击、拖动来制作网格，亲手绘制 128×128 的像素贴图（最大 1024×1024），<br>
 再导出为 OBJ / glTF / GLB。
 
-![version](https://img.shields.io/badge/version-0.5.4-f8c040)
+![version](https://img.shields.io/badge/version-0.5.5-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -27,6 +27,7 @@
 - **7 种基本形状** — plane, cube, prism, pyramid, cylinder, cone, sphere。在空白处右键即可朝向该视图创建，也可以用顶栏的 `+` 按钮
 - **点击拖动编辑** — 拖动网格 / 顶点来移动，`R`+拖动旋转，`T`+拖动缩放，拖动时按住 `Shift` 移动原点，`Ctrl` 反转网格吸附
 - **框选** — 2D 视图在空白处拖动，3D 视图用 `Ctrl`+拖动（`Shift` 追加选择）
+- **点击前高亮** — 点击后将被选中的对象会提前以浅蓝色显示（面，或整个网格）。顶点周围会出现圆圈，在 3D 视图中点击圆圈内即可选中该顶点
 - **编辑** — 挤出面、删除面 / 顶点、合并与吸附顶点、镜像、克隆、复制 / 粘贴网格
 - **选择栏** — 选中面、顶点或整个网格后，视图下方会出现一个小栏，显示选中了什么以及可用的操作
   - 面：挤出、删除 │ 面颜色、选项

@@ -122,11 +122,26 @@ static void box_select(App *a, const Viewport *vp, Rectangle r, bool add) {
     }
 }
 
-/* 3D 뷰 클릭: 다른 메쉬면 메쉬 선택, 활성 메쉬면 면 선택 */
+/* 3D 뷰에서 좌클릭으로 고를 정점 (텍스처 모드는 면만 다루므로 없음) */
+static int pick_vert_3d(App *a, const Viewport *vp, Vector2 m) {
+    return a->mode == MODE_MODEL ? view_pick_vert_3d(a, vp, m) : -1;
+}
+
+/* 3D 뷰 클릭: 활성 메쉬의 정점 강조 원 안이면 정점, 다른 메쉬면 메쉬 선택, 활성 메쉬면 면 선택 */
 static void click_3d(App *a, const Viewport *vp, Vector2 m) {
     int oi, fi;
     Object *o = app_active(a);
-    if (view_pick_face(a, vp, m, -1, &oi, &fi)) {
+    int vi = pick_vert_3d(a, vp, m);
+    if (vi >= 0) {
+        if (key_shift()) {
+            /* 면 선택은 꼭짓점 선택으로 바꿔서 이어감 */
+            for (int i = 0; i < o->nfaces; i++) o->faces[i].sel = false;
+            o->verts[vi].sel = !o->verts[vi].sel;
+        } else {
+            obj_clear_selection(o);
+            o->verts[vi].sel = true;
+        }
+    } else if (view_pick_face(a, vp, m, -1, &oi, &fi)) {
         if (oi != a->scene.active) {
             app_select_mesh(a, oi);
             return;
@@ -150,7 +165,7 @@ static void click_3d(App *a, const Viewport *vp, Vector2 m) {
 static void open_context_menu(App *a, const Viewport *vp, Vector2 m) {
     Object *o = app_active(a);
     a->menu_view = vp->kind;
-    int vi = view_pick_vert(a, vp, m);
+    int vi = vp->kind == VIEW_3D ? pick_vert_3d(a, vp, m) : view_pick_vert(a, vp, m);
     int oi, fi;
     /* 3D 뷰는 직접 고른 정점일 때만 (면을 고르면 꼭짓점도 같이 골라지므로 면이 골라져 있으면 면 메뉴) */
     bool vert_menu = vp->kind != VIEW_3D || (o && vi >= 0 && o->verts[vi].sel && count_sel_faces(o) == 0);
@@ -388,9 +403,41 @@ static void update_keys(App *a) {
     if (!IsKeyDown(KEY_R) && !IsKeyDown(KEY_T)) arrow_move(a);
 }
 
+/* update_mouse의 좌클릭 판정과 같은 순서로, 누르기 전에 강조할 대상을 정한다 */
+static void update_hover(App *a, bool input_ok) {
+    a->hover_obj = a->hover_face = a->hover_vert = -1;
+    if (!input_ok || g_drag != D_NONE || a->menu != MENU_NONE) return;
+    Vector2 m = GetMousePosition();
+    int hv = view_at(a, m);
+    if (hv < 0) return;
+    const Viewport *vp = &a->views[hv];
+    int oi, fi;
+    if (hv == VIEW_3D) {
+        if (key_ctrl()) return;                       /* Ctrl+드래그는 박스 선택 */
+        int vi = pick_vert_3d(a, vp, m);
+        if (vi >= 0) {
+            a->hover_obj = a->scene.active;
+            a->hover_vert = vi;
+            return;
+        }
+        if (!view_pick_face(a, vp, m, -1, &oi, &fi)) return;
+        a->hover_obj = oi;
+        if (oi == a->scene.active) a->hover_face = fi;   /* 다른 메쉬면 메쉬 전체 */
+        return;
+    }
+    int vi = view_pick_vert(a, vp, m);
+    if (vi >= 0) {
+        a->hover_obj = a->scene.active;
+        a->hover_vert = vi;
+    } else if (view_pick_face(a, vp, m, -1, &oi, &fi) && oi != a->scene.active) {
+        a->hover_obj = oi;                             /* 직교 뷰에서 면을 누르면 메쉬 선택 */
+    }
+}
+
 void model_update(App *a, bool input_ok, bool keys) {
     if (a->scene.active >= a->scene.count) a->scene.active = -1;
     update_mouse(a, input_ok && !a->ui_hover);
+    update_hover(a, input_ok && !a->ui_hover);
     if (keys && input_ok && g_drag == D_NONE) update_keys(a);
 }
 

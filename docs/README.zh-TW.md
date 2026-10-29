@@ -9,7 +9,7 @@
 在四分割視圖中點擊、拖曳來製作網格，親手繪製 128×128 的像素貼圖（最大 1024×1024），<br>
 再匯出為 OBJ / glTF / GLB。
 
-![version](https://img.shields.io/badge/version-0.5.4-f8c040)
+![version](https://img.shields.io/badge/version-0.5.5-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -27,6 +27,7 @@
 - **7 種基本形狀** — plane, cube, prism, pyramid, cylinder, cone, sphere。在空白處按右鍵即可朝向該視圖建立，也可以用頂端列的 `+` 按鈕
 - **點擊拖曳編輯** — 拖曳網格 / 頂點來移動，`R`+拖曳旋轉，`T`+拖曳縮放，拖曳時按住 `Shift` 移動原點，`Ctrl` 反轉格線貼齊
 - **框選** — 2D 視圖在空白處拖曳，3D 視圖用 `Ctrl`+拖曳（`Shift` 加選）
+- **點擊前醒目提示** — 點擊後會被選取的對象會先以淺藍色顯示（面，或整個網格）。頂點周圍會出現圓圈，在 3D 視圖中點擊圓圈內即可選取該頂點
 - **編輯** — 擠出面、刪除面 / 頂點、合併與貼齊頂點、鏡像、再製、複製 / 貼上網格
 - **選取列** — 選取面、頂點或整個網格後，視圖下方會出現一個小列，顯示選取了什麼以及可用的操作
   - 面：擠出、刪除 │ 面顏色、選項

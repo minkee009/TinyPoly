@@ -9,7 +9,7 @@
 Build meshes by clicking and dragging in four views, paint 128×128 pixel textures by hand (up to 1024×1024),<br>
 and export to OBJ / glTF / GLB.
 
-![version](https://img.shields.io/badge/version-0.5.4-f8c040)
+![version](https://img.shields.io/badge/version-0.5.5-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -27,6 +27,7 @@ and export to OBJ / glTF / GLB.
 - **7 primitives**: plane, cube, prism, pyramid, cylinder, cone, sphere. Right-click empty space to create one facing that view, or use the `+` button in the top bar
 - **Click & drag editing**: drag a mesh or vertex to move it, `R`+drag to rotate, `T`+drag to scale, hold `Shift` while dragging to move the origin, `Ctrl` inverts grid snapping
 - **Box select**: drag on empty space in the 2D views, `Ctrl`+drag in the 3D view (`Shift` adds to the selection)
+- **Hover highlight**: before you click, what the click would pick lights up in light blue (a face, or the whole mesh). A vertex gets a ring around it, and in the 3D view clicking inside that ring selects the vertex
 - **Editing**: extrude faces, delete faces/vertices, merge and snap vertices, mirror, clone, copy/paste meshes
 - **Selection bar**: select faces, vertices or a whole mesh and a small bar appears at the bottom of the views, showing what is selected and what you can do with it
   - faces: extrude, delete │ face color, options

@@ -14,6 +14,8 @@ static const Color AXIS_COLOR[3] = {
     { 230, 70, 80, 255 }, { 90, 210, 90, 255 }, { 70, 140, 250, 255 },
 };
 static const Color SEL_COLOR = { 255, 200, 60, 255 };
+static const Color ACTIVE_EDGE_COLOR = { 255, 255, 255, 200 };   /* 활성 메쉬 모서리 */
+static const Color HOVER_COLOR = { 120, 230, 255, 255 };   /* 누르면 고를 대상 */
 static const char *VIEW_NAMES[VIEW_COUNT] = { "top", "3d", "front", "side" };
 
 /* 원근 보정 텍스처 + 투명색 픽셀은 버림 */
@@ -222,6 +224,43 @@ int view_pick_vert(App *a, const Viewport *vp, Vector2 m) {
     return found;
 }
 
+/* 카메라에서 p까지 사이에 화면에 그려지는 면이 있으면 가려진 것 */
+static bool vert_visible(const App *a, const Viewport *vp, Vector3 p) {
+    Vector3 d = Vector3Subtract(p, vp->cam.position);
+    float dist = Vector3Length(d);
+    if (dist < 1e-4f) return true;
+    Ray ray = { vp->cam.position, Vector3Scale(d, 1.0f / dist) };
+    float limit = dist * 0.995f;         /* 이 정점을 꼭짓점으로 쓰는 면은 거리 dist에서 맞으므로 빼고 */
+    for (int i = 0; i < a->scene.count; i++) {
+        const Object *o = &a->scene.objs[i];
+        if (o->hidden) continue;
+        for (int k = 0; k < o->nfaces; k++) {
+            const Face *f = &o->faces[k];
+            if (!(f->flags & FACE_DOUBLE) && Vector3DotProduct(obj_face_normal(o, f), ray.direction) >= 0) continue;
+            Vector3 p0 = o->verts[f->v[0]].p;
+            for (int j = 1; j + 1 < f->n; j++) {
+                RayCollision c = GetRayCollisionTriangle(ray, p0, o->verts[f->v[j]].p, o->verts[f->v[j + 1]].p);
+                if (c.hit && c.distance < limit) return false;
+            }
+        }
+    }
+    return true;
+}
+
+int view_pick_vert_3d(App *a, const Viewport *vp, Vector2 m) {
+    Object *o = app_active(a);
+    if (!o || o->hidden) return -1;
+    float best = (float)(VERT_RING_R * a->pixel);
+    int found = -1;
+    for (int i = 0; i < o->nverts; i++) {
+        Vector2 sp;
+        if (!view_project(vp, o->verts[i].p, &sp)) continue;
+        float d = Vector2Distance(sp, m) - (o->verts[i].sel ? 0.5f : 0.0f);   /* 겹치면 선택된 쪽 */
+        if (d < best && vert_visible(a, vp, o->verts[i].p)) { best = d; found = i; }
+    }
+    return found;
+}
+
 /* ---- 그리기 ---- */
 
 static int light_level(Vector3 n) {
@@ -262,6 +301,7 @@ static void draw_meshes(App *a) {
                         /* 텍스처 면은 흰색에 음영만 곱함 */
                         Color c = shade_color(textured ? WHITE : f->color, level);
                         if (f->sel && i == s->active && blink) c = ColorLerp(c, SEL_COLOR, 0.6f);
+                        if (i == a->hover_obj && k == a->hover_face) c = ColorLerp(c, HOVER_COLOR, 0.4f);
                         rlColor4ub(c.r, c.g, c.b, 255);
                         for (int j = 1; j + 1 < f->n; j++) {
                             int idx[3] = { 0, j, j + 1 };
@@ -295,6 +335,54 @@ static void draw_edges(const Viewport *vp, const Object *o, Color c, bool only_s
         if (only_sel && !f->sel) continue;
         for (int k = 0; k < f->n; k++)
             DrawLine3D(lift(vp, o->verts[f->v[k]].p), lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
+    }
+}
+
+static void draw_face_edges(const Viewport *vp, const Object *o, const Face *f, Color c) {
+    for (int k = 0; k < f->n; k++)
+        DrawLine3D(lift(vp, o->verts[f->v[k]].p), lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
+}
+
+static bool faces_camera(const Viewport *vp, const Object *o, const Face *f) {
+    if (f->flags & FACE_DOUBLE) return true;
+    return Vector3DotProduct(obj_face_normal(o, f), Vector3Subtract(vp->cam.position, o->verts[f->v[0]].p)) > 0;
+}
+
+static bool same_point(Vector3 p, Vector3 q) {
+    return Vector3DistanceSqr(p, q) < 1e-8f;
+}
+
+/* 윤곽선: 카메라를 향한 면의 모서리 중 맞닿은 면이 없거나 그 면이 등을 돌린 것.
+   정점을 공유하지 않는 면도 있으므로 위치로 비교 */
+static void draw_outline(const Viewport *vp, const Object *o, Color c) {
+    for (int i = 0; i < o->nfaces; i++) {
+        const Face *f = &o->faces[i];
+        if (!faces_camera(vp, o, f)) continue;
+        for (int k = 0; k < f->n; k++) {
+            Vector3 p = o->verts[f->v[k]].p, q = o->verts[f->v[(k + 1) % f->n]].p;
+            bool inner = false;
+            for (int j = 0; j < o->nfaces && !inner; j++) {
+                const Face *g = &o->faces[j];
+                if (j == i || !faces_camera(vp, o, g)) continue;
+                for (int m = 0; m < g->n && !inner; m++) {
+                    Vector3 r = o->verts[g->v[m]].p, s = o->verts[g->v[(m + 1) % g->n]].p;
+                    inner = (same_point(p, s) && same_point(q, r)) || (same_point(p, r) && same_point(q, s));
+                }
+            }
+            if (!inner) DrawLine3D(lift(vp, p), lift(vp, q), c);
+        }
+    }
+}
+
+/* 도트 원 테두리 (중점 원 알고리즘) */
+static void draw_pixel_ring(int cx, int cy, int r, Color c) {
+    int x = r, y = 0, err = 1 - r;
+    while (x >= y) {
+        int pts[8][2] = { { x, y }, { y, x }, { -y, x }, { -x, y }, { -x, -y }, { -y, -x }, { y, -x }, { x, -y } };
+        for (int i = 0; i < 8; i++) DrawPixel(cx + pts[i][0], cy + pts[i][1], c);
+        y++;
+        if (err < 0) err += 2 * y + 1;
+        else { x--; err += 2 * (y - x) + 1; }
     }
 }
 
@@ -358,9 +446,16 @@ void view_draw(App *a, Viewport *vp) {
         const Object *o = &s->objs[i];
         if (o->hidden) continue;
         if (a->render_mode == RENDER_WIRE) draw_edges(vp, o, o == act ? SEL_COLOR : WHITE, false);
-        else if (o == act && a->mode == MODE_MODEL) draw_edges(vp, o, (Color){ 255, 255, 255, 200 }, false);
+        else if (o == act && a->mode == MODE_MODEL) draw_edges(vp, o, ACTIVE_EDGE_COLOR, false);
+        /* 텍스처 모드는 칠한 면을 가리지 않게 윤곽만 */
+        else if (o == act) draw_outline(vp, o, ACTIVE_EDGE_COLOR);
     }
     if (act) draw_edges(vp, act, SEL_COLOR, true);
+
+    /* 누르기 전 강조: 면은 그 면의 테두리, 다른 메쉬는 메쉬 전체 테두리 */
+    const Object *hov = a->hover_obj >= 0 && a->hover_obj < s->count ? &s->objs[a->hover_obj] : NULL;
+    if (hov && a->hover_face >= 0 && a->hover_face < hov->nfaces) draw_face_edges(vp, hov, &hov->faces[a->hover_face], HOVER_COLOR);
+    else if (hov && a->hover_face < 0 && a->hover_vert < 0) draw_edges(vp, hov, HOVER_COLOR, false);
 
     if (act && ortho && a->mode == MODE_MODEL) {
         Vector3 r, u, n;
@@ -383,6 +478,18 @@ void view_draw(App *a, Viewport *vp) {
             int z = v->sel ? 3 : 2;
             DrawRectangle((int)sp.x - z / 2, (int)sp.y - z / 2, z, z, v->sel ? SEL_COLOR : (Color){ 20, 20, 30, 255 });
             if (!v->sel) DrawPixel((int)sp.x, (int)sp.y, WHITE);
+        }
+    }
+    /* 누르기 전 강조: 정점은 둘레에 빈 원 (밝은 면 위에서도 보이게 바깥에 어두운 테두리) */
+    if (hov && hov == act && a->hover_vert >= 0 && a->hover_vert < act->nverts) {
+        Vector2 sp;
+        Vector3 p = act->verts[a->hover_vert].p;
+        Vector3 fwd = Vector3Subtract(vp->cam.target, vp->cam.position);
+        if (ortho || Vector3DotProduct(Vector3Subtract(p, vp->cam.position), fwd) > 0) {
+            sp = GetWorldToScreenEx(p, vp->cam, vp->rtw, vp->rth);
+            /* 반지름은 커서의 이동 화살표보다 커서 가려지지 않게 */
+            draw_pixel_ring((int)sp.x, (int)sp.y, VERT_RING_R + 1, (Color){ 20, 20, 30, 255 });
+            draw_pixel_ring((int)sp.x, (int)sp.y, VERT_RING_R, HOVER_COLOR);
         }
     }
     EndTextureMode();

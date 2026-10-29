@@ -6,6 +6,7 @@
 #include "mesh.h"
 
 #define TOPBAR_H 30
+#define VERT_RING_R 6              /* 정점 강조 원 반지름 (뷰 도트 단위). 3D 뷰는 이 안을 누르면 정점 선택 */
 
 typedef enum { MODE_MODEL, MODE_TEXTURE } AppMode;
 
@@ -83,6 +84,8 @@ typedef struct {
     double msg_time;
     bool dirty;
     bool ui_hover;             /* 마우스가 UI 창 위 */
+    /* 지금 좌클릭하면 고를 대상 (없으면 -1). face와 vert가 둘 다 -1이면 메쉬 전체 */
+    int hover_obj, hover_face, hover_vert;
     mu_Context *ui;
 } App;
 
@@ -108,6 +111,7 @@ void view_axes(const Viewport *vp, Vector3 *right, Vector3 *up, Vector3 *normal)
 float view_units_per_pixel(const App *a, const Viewport *vp);
 bool view_pick_face(App *a, const Viewport *vp, Vector2 m, int only, int *oi, int *fi);
 int  view_pick_vert(App *a, const Viewport *vp, Vector2 m);
+int  view_pick_vert_3d(App *a, const Viewport *vp, Vector2 m);   /* 강조 원 안의 보이는 정점 */
 extern Rectangle g_box;        /* 박스 선택 표시 (w == 0이면 없음) */
 
 /* model.c */

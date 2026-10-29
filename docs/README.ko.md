@@ -9,7 +9,7 @@
 4분할 뷰에서 클릭·드래그로 메쉬를 만들고, 128×128 도트 텍스처(최대 1024×1024)를 직접 그려서<br>
 OBJ / glTF / GLB로 내보냅니다.
 
-![version](https://img.shields.io/badge/version-0.5.4-f8c040)
+![version](https://img.shields.io/badge/version-0.5.5-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -27,6 +27,7 @@ OBJ / glTF / GLB로 내보냅니다.
 - **기본 도형 7종** — plane, cube, prism, pyramid, cylinder, cone, sphere. 빈 곳을 우클릭하면 그 뷰를 향해 생성, 또는 상단바 `+` 버튼
 - **클릭·드래그 편집** — 메쉬/정점 드래그로 이동, `R`+드래그 회전, `T`+드래그 크기, 드래그 중 `Shift`로 원점 이동, `Ctrl`로 그리드 스냅 반전
 - **박스 선택** — 2D 뷰는 빈 곳에서 드래그, 3D 뷰는 `Ctrl`+드래그 (`Shift`로 추가 선택)
+- **누르기 전 강조** — 클릭하면 골라질 것이 하늘색으로 미리 표시됨 (면, 또는 메쉬 전체). 정점은 둘레에 원이 생기고, 3D 뷰에서는 그 원 안을 클릭하면 정점이 선택됨
 - **편집** — 면 돌출, 면/정점 삭제, 정점 병합·스냅, 미러, 복제, 메쉬 복사/붙여넣기
 - **선택 막대** — 면이나 정점, 또는 메쉬를 고르면 뷰 아래쪽에 작은 막대가 나타나서 무엇을 골랐는지와 쓸 수 있는 동작을 보여줌
   - 면: 돌출, 삭제 │ 면 색, 옵션

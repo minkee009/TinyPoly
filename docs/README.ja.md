@@ -9,7 +9,7 @@
 4 分割ビューでクリック・ドラッグしてメッシュを作り、128×128 のドット絵テクスチャ（最大 1024×1024）を手で描いて<br>
 OBJ / glTF / GLB に書き出します。
 
-![version](https://img.shields.io/badge/version-0.5.4-f8c040)
+![version](https://img.shields.io/badge/version-0.5.5-f8c040)
 ![language](https://img.shields.io/badge/C23-raylib%205.5-3ca0fa)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8474be)
 ![license](https://img.shields.io/badge/license-MIT-50d250)
@@ -27,6 +27,7 @@ OBJ / glTF / GLB に書き出します。
 - **基本図形 7 種** — plane, cube, prism, pyramid, cylinder, cone, sphere。何もない所を右クリックするとそのビューの向きで作成、または上部バーの `+` ボタン
 - **クリック・ドラッグ編集** — メッシュ / 頂点をドラッグで移動、`R`+ドラッグで回転、`T`+ドラッグで拡大縮小、ドラッグ中に `Shift` で原点を移動、`Ctrl` でグリッドスナップを反転
 - **矩形選択** — 2D ビューは何もない所からドラッグ、3D ビューは `Ctrl`+ドラッグ（`Shift` で追加選択）
+- **クリック前のハイライト** — クリックすると選ばれるものが水色で先に表示される（面、またはメッシュ全体）。頂点は周りに円が出て、3D ビューではその円の中をクリックすると頂点を選択
 - **編集** — 面の押し出し、面 / 頂点の削除、頂点の結合・スナップ、ミラー、複製、メッシュのコピー / 貼り付け
 - **選択バー** — 面・頂点・メッシュを選ぶとビューの下に小さなバーが現れ、何を選んでいるかと使える操作を表示
   - 面: 押し出し、削除 │ 面の色、オプション
