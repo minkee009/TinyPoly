@@ -39,6 +39,9 @@ if(NOT raylib_FOUND)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(raylib)
+    if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+        target_compile_options(raylib PRIVATE "-Wno-tautological-compare")
+    endif()
 endif()
 
 target_compile_definitions(TinyPoly PRIVATE TINYPOLY_VERSION="${PROJECT_VERSION}")

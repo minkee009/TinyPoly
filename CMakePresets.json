@@ -6,7 +6,11 @@
             "name": "default",
             "displayName": "TinyPoly",
             "generator": "Ninja Multi-Config",
-            "binaryDir": "${sourceDir}/build/${hostSystemName}"
+            "binaryDir": "${sourceDir}/build/${hostSystemName}",
+            "warnings": {
+                "dev": false,
+                "deprecated": false
+            }
         }
     ],
     "buildPresets": [
