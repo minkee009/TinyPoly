@@ -271,7 +271,6 @@ static int light_level(Vector3 n) {
 
 static void draw_meshes(App *a) {
     const Scene *s = &a->scene;
-    bool blink = fmod(GetTime(), 0.6) < 0.3;
 
     BeginShaderMode(a->shader);
     for (int behind = 1; behind >= 0; behind--) {
@@ -300,7 +299,8 @@ static void draw_meshes(App *a) {
 
                         /* 텍스처 면은 흰색에 음영만 곱함 */
                         Color c = shade_color(textured ? WHITE : f->color, level);
-                        if (f->sel && i == s->active && blink) c = ColorLerp(c, SEL_COLOR, 0.6f);
+                        /* 텍스처 모드는 칠한 색을 그대로 보이게 덧칠 없이 테두리만 */
+                        if (f->sel && i == s->active && a->mode == MODE_MODEL) c = ColorLerp(c, SEL_COLOR, 0.3f);
                         if (i == a->hover_obj && k == a->hover_face) c = ColorLerp(c, HOVER_COLOR, 0.4f);
                         rlColor4ub(c.r, c.g, c.b, 255);
                         for (int j = 1; j + 1 < f->n; j++) {
