@@ -1,6 +1,6 @@
 <div align="center">
 
-[English](../README.md) | **한국어**
+[English](../README.md) | **한국어** | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
 <h1><img src="icon.png" width="64" align="absmiddle" alt="TinyPoly 아이콘"> TinyPoly</h1>
 
