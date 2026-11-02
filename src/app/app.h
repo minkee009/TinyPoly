@@ -94,18 +94,18 @@ typedef struct {
     mu_Context *ui;
 } App;
 
-void app_msg(App *a, const char *fmt, ...);
-void app_mark(App *a);         /* 변경 직전: undo 저장 + dirty */
-void app_undo(App *a);
-void app_redo(App *a);
-Object *app_active(App *a);
-void app_select_mesh(App *a, int i);
-void app_open_menu(App *a, MenuKind m);
+void AppMsg(App *a, const char *fmt, ...);
+void AppMark(App *a);         /* 변경 직전: undo 저장 + dirty */
+void AppUndo(App *a);
+void AppRedo(App *a);
+Object *AppActive(App *a);
+void AppSelectMesh(App *a, int i);
+void AppOpenMenu(App *a, MenuKind m);
 
 /* 수명: 창을 연 뒤 init, 매 프레임 update → draw, 창을 닫은 뒤 shutdown */
-void app_init(App *a);
-void app_update(App *a);       /* 입력 처리 + UI 만들기 */
-void app_draw(App *a);
-void app_shutdown(App *a);
+void AppInit(App *a);
+void AppUpdate(App *a);       /* 입력 처리 + UI 만들기 */
+void AppDraw(App *a);
+void AppShutdown(App *a);
 
 #endif

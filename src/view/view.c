@@ -21,9 +21,9 @@ static const char *FS =
     "void main() { vec4 t = texture(texture0, fragTexCoord); if (t.a < 0.5) discard;\n"
     "  finalColor = t * fragColor * colDiffuse; }\n";
 
-void view_init(App *a) {
+void ViewInit(App *a) {
     a->shader = LoadShaderFromMemory(VS, FS);
-    a->tex_dirty = true;            /* 첫 view_upload_texture에서 만든다 */
+    a->tex_dirty = true;            /* 첫 ViewUploadTexture에서 만든다 */
 
     static const Vector3 centers[VIEW_COUNT] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0.5f, 0 }, { 0, 0.5f, 0 } };
     for (int i = 0; i < VIEW_COUNT; i++) {
@@ -33,7 +33,7 @@ void view_init(App *a) {
     }
 }
 
-void view_tex_dirty(App *a, int x0, int y0, int x1, int y1) {
+void ViewTexDirty(App *a, int x0, int y0, int x1, int y1) {
     if (!a->tex_rect_dirty) {
         a->dx0 = x0; a->dy0 = y0; a->dx1 = x1; a->dy1 = y1;
         a->tex_rect_dirty = true;
@@ -46,7 +46,7 @@ void view_tex_dirty(App *a, int x0, int y0, int x1, int y1) {
 }
 
 /* 크기가 바뀌었거나 다른 버퍼(되돌리기 등)면 새로 올리고, 아니면 바뀐 영역만 올린다 */
-void view_upload_texture(App *a) {
+void ViewUploadTexture(App *a) {
     const TexBuf *t = a->scene.tex;
     if (!IsTextureValid(a->gpu_tex) || a->gpu_w != t->w || a->gpu_h != t->h) {
         if (IsTextureValid(a->gpu_tex)) UnloadTexture(a->gpu_tex);
@@ -73,7 +73,7 @@ void view_upload_texture(App *a) {
     a->tex_rect_dirty = false;
 }
 
-static void set_rect(App *a, Viewport *vp, Rectangle r) {
+static void SetRect(App *a, Viewport *vp, Rectangle r) {
     int rtw = (int)r.width / a->pixel, rth = (int)r.height / a->pixel;
     if (rtw < 1) rtw = 1;
     if (rth < 1) rth = 1;
@@ -87,7 +87,7 @@ static void set_rect(App *a, Viewport *vp, Rectangle r) {
     }
 }
 
-void view_layout(App *a) {
+void ViewLayout(App *a) {
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
     Rectangle area = { 0, TOPBAR_H, W, H - TOPBAR_H };
     for (int i = 0; i < VIEW_COUNT; i++) a->views[i].rect.width = 0;
@@ -95,19 +95,19 @@ void view_layout(App *a) {
     if (a->mode == MODE_TEXTURE) {
         float cw = floorf(area.width * 0.55f);
         a->canvas_rect = (Rectangle){ 0, area.y, cw, area.height };
-        set_rect(a, &a->views[VIEW_3D], (Rectangle){ cw + 2, area.y, area.width - cw - 2, area.height });
+        SetRect(a, &a->views[VIEW_3D], (Rectangle){ cw + 2, area.y, area.width - cw - 2, area.height });
     } else if (a->full >= 0) {
-        set_rect(a, &a->views[a->full], area);
+        SetRect(a, &a->views[a->full], area);
     } else {
         float hw = floorf((area.width - 2) / 2), hh = floorf((area.height - 2) / 2);
-        set_rect(a, &a->views[VIEW_TOP],   (Rectangle){ 0, area.y, hw, hh });
-        set_rect(a, &a->views[VIEW_3D],    (Rectangle){ hw + 2, area.y, area.width - hw - 2, hh });
-        set_rect(a, &a->views[VIEW_FRONT], (Rectangle){ 0, area.y + hh + 2, hw, area.height - hh - 2 });
-        set_rect(a, &a->views[VIEW_SIDE],  (Rectangle){ hw + 2, area.y + hh + 2, area.width - hw - 2, area.height - hh - 2 });
+        SetRect(a, &a->views[VIEW_TOP],   (Rectangle){ 0, area.y, hw, hh });
+        SetRect(a, &a->views[VIEW_3D],    (Rectangle){ hw + 2, area.y, area.width - hw - 2, hh });
+        SetRect(a, &a->views[VIEW_FRONT], (Rectangle){ 0, area.y + hh + 2, hw, area.height - hh - 2 });
+        SetRect(a, &a->views[VIEW_SIDE],  (Rectangle){ hw + 2, area.y + hh + 2, area.width - hw - 2, area.height - hh - 2 });
     }
 }
 
-void view_axes(const Viewport *vp, Vector3 *right, Vector3 *up, Vector3 *normal) {
+void ViewAxes(const Viewport *vp, Vector3 *right, Vector3 *up, Vector3 *normal) {
     switch (vp->kind) {
     case VIEW_TOP:   *right = (Vector3){ 1, 0, 0 };  *up = (Vector3){ 0, 0, -1 }; *normal = (Vector3){ 0, 1, 0 }; return;
     case VIEW_FRONT: *right = (Vector3){ 1, 0, 0 };  *up = (Vector3){ 0, 1, 0 };  *normal = (Vector3){ 0, 0, 1 }; return;
@@ -121,7 +121,7 @@ void view_axes(const Viewport *vp, Vector3 *right, Vector3 *up, Vector3 *normal)
     }
 }
 
-void view_update_cameras(App *a) {
+void ViewUpdateCameras(App *a) {
     for (int i = 0; i < VIEW_COUNT; i++) {
         Viewport *vp = &a->views[i];
         Camera3D *c = &vp->cam;
@@ -135,7 +135,7 @@ void view_update_cameras(App *a) {
             c->projection = CAMERA_PERSPECTIVE;
         } else {
             Vector3 r, u, n;
-            view_axes(vp, &r, &u, &n);
+            ViewAxes(vp, &r, &u, &n);
             c->target = vp->center;
             c->position = Vector3Add(vp->center, Vector3Scale(n, 100.0f));
             c->up = u;
@@ -145,18 +145,18 @@ void view_update_cameras(App *a) {
     }
 }
 
-int view_at(const App *a, Vector2 m) {
+int ViewAt(const App *a, Vector2 m) {
     for (int i = 0; i < VIEW_COUNT; i++)
         if (a->views[i].rect.width > 0 && CheckCollisionPointRec(m, a->views[i].rect)) return i;
     return -1;
 }
 
-Ray view_ray(const Viewport *vp, Vector2 m) {
+Ray ViewRay(const Viewport *vp, Vector2 m) {
     Vector2 local = { m.x - vp->rect.x, m.y - vp->rect.y };
     return GetScreenToWorldRayEx(local, vp->cam, (int)vp->rect.width, (int)vp->rect.height);
 }
 
-bool view_project(const Viewport *vp, Vector3 p, Vector2 *out) {
+bool ViewProject(const Viewport *vp, Vector3 p, Vector2 *out) {
     if (vp->kind == VIEW_3D) {
         Vector3 fwd = Vector3Subtract(vp->cam.target, vp->cam.position);
         if (Vector3DotProduct(Vector3Subtract(p, vp->cam.position), fwd) <= 0.01f) return false;
@@ -166,7 +166,7 @@ bool view_project(const Viewport *vp, Vector3 p, Vector2 *out) {
     return true;
 }
 
-float view_units_per_pixel(const App *a, const Viewport *vp) {
+float ViewUnitsPerPixel(const App *a, const Viewport *vp) {
     float h = vp->kind == VIEW_3D ? 2.0f * a->dist * tanf(22.5f * DEG2RAD) : vp->zoom;
     return h / vp->rect.height;
 }

@@ -155,7 +155,7 @@ static const CursorArt ART[CURSOR_COUNT] = {
     }, 5, 5 },
 };
 
-static void draw_art(const CursorArt *art, Vector2 m, Color dyn) {
+static void DrawArt(const CursorArt *art, Vector2 m, Color dyn) {
     const int s = UI_FONT_SCALE;
     const Color outline = { 20, 18, 28, 255 };
     const Color fill = { 248, 244, 236, 255 };
@@ -179,7 +179,7 @@ static void draw_art(const CursorArt *art, Vector2 m, Color dyn) {
 /* macOS는 커서 위에 창이 생기거나 창이 커서 아래로 커지면(타이틀바 더블클릭) enter 이벤트를
    안 보내서 IsCursorOnScreen()이 false로 남는다. 그동안 OS 커서는 이미 숨겨져 있으니,
    마우스가 창 안에서 움직이면 창 안에 있다고 대신 판단한다 */
-static bool cursor_visible(void) {
+static bool CursorVisible(void) {
     static bool was_on, stray;
     bool on = IsCursorOnScreen();
     if (on != was_on) {             /* 진짜 enter/leave가 오면 그쪽을 따른다 */
@@ -194,18 +194,18 @@ static bool cursor_visible(void) {
     return stray;
 }
 
-void cursor_draw(App *a) {
-    if (!cursor_visible()) return;
+void CursorDraw(App *a) {
+    if (!CursorVisible()) return;
 
     int kind = CURSOR_ARROW;
     if (!a->ui_hover) {
-        kind = a->mode == MODE_TEXTURE ? paint_cursor(a) : -1;
-        if (kind < 0) kind = model_cursor(a);
+        kind = a->mode == MODE_TEXTURE ? PaintCursor(a) : -1;
+        if (kind < 0) kind = ModelCursor(a);
     }
 
     /* 스포이드는 커서 아래 텍셀 색, 나머지는 현재 색 */
     Color dyn = a->color;
-    if (kind == CURSOR_PICKER) paint_hover_texel(a, &dyn);
+    if (kind == CURSOR_PICKER) PaintHoverTexel(a, &dyn);
     dyn.a = 255;                    /* 커서 안의 색은 불투명하게 */
-    draw_art(&ART[kind], GetMousePosition(), dyn);
+    DrawArt(&ART[kind], GetMousePosition(), dyn);
 }

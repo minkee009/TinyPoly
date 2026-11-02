@@ -7,7 +7,7 @@
 
 const char *PRIM_NAMES[PRIM_COUNT] = { "plane", "cube", "prism", "pyramid", "cylinder", "cone", "sphere" };
 
-static void *grow(void *p, int *cap, int need, size_t elem) {
+static void *Grow(void *p, int *cap, int need, size_t elem) {
     if (need <= *cap) return p;
     int nc = *cap ? *cap * 2 : 16;
     while (nc < need) nc *= 2;
@@ -17,15 +17,15 @@ static void *grow(void *p, int *cap, int need, size_t elem) {
     return p;
 }
 
-int obj_add_vert(Object *o, Vector3 p) {
-    o->verts = grow(o->verts, &o->cverts, o->nverts + 1, sizeof(Vert));
+int ObjAddVert(Object *o, Vector3 p) {
+    o->verts = Grow(o->verts, &o->cverts, o->nverts + 1, sizeof(Vert));
     o->verts[o->nverts] = (Vert){ p, false };
     return o->nverts++;
 }
 
-int obj_add_face(Object *o, const int *idx, int n, Color color) {
+int ObjAddFace(Object *o, const int *idx, int n, Color color) {
     if (n < 3 || n > MAX_FACE_VERTS) return -1;
-    o->faces = grow(o->faces, &o->cfaces, o->nfaces + 1, sizeof(Face));
+    o->faces = Grow(o->faces, &o->cfaces, o->nfaces + 1, sizeof(Face));
     Face *f = &o->faces[o->nfaces];
     memset(f, 0, sizeof *f);
     f->n = n;
@@ -34,28 +34,28 @@ int obj_add_face(Object *o, const int *idx, int n, Color color) {
     return o->nfaces++;
 }
 
-void obj_free(Object *o) {
+void ObjFree(Object *o) {
     free(o->verts);
     free(o->faces);
     memset(o, 0, sizeof *o);
 }
 
-void obj_copy(Object *dst, const Object *src) {
+void ObjCopy(Object *dst, const Object *src) {
     *dst = *src;
     dst->verts = NULL; dst->cverts = 0;
     dst->faces = NULL; dst->cfaces = 0;
     if (src->nverts) {
-        dst->verts = grow(NULL, &dst->cverts, src->nverts, sizeof(Vert));
+        dst->verts = Grow(NULL, &dst->cverts, src->nverts, sizeof(Vert));
         memcpy(dst->verts, src->verts, sizeof(Vert) * (size_t)src->nverts);
     }
     if (src->nfaces) {
-        dst->faces = grow(NULL, &dst->cfaces, src->nfaces, sizeof(Face));
+        dst->faces = Grow(NULL, &dst->cfaces, src->nfaces, sizeof(Face));
         memcpy(dst->faces, src->faces, sizeof(Face) * (size_t)src->nfaces);
     }
 }
 
 /* Newell 방식: 오목하거나 살짝 휜 면에서도 안정적 */
-Vector3 obj_face_normal(const Object *o, const Face *f) {
+Vector3 ObjFaceNormal(const Object *o, const Face *f) {
     Vector3 n = { 0 };
     for (int i = 0; i < f->n; i++) {
         Vector3 a = o->verts[f->v[i]].p;
@@ -67,19 +67,19 @@ Vector3 obj_face_normal(const Object *o, const Face *f) {
     return Vector3Normalize(n);
 }
 
-Vector3 obj_face_center(const Object *o, const Face *f) {
+Vector3 ObjFaceCenter(const Object *o, const Face *f) {
     Vector3 c = { 0 };
     for (int i = 0; i < f->n; i++) c = Vector3Add(c, o->verts[f->v[i]].p);
     return Vector3Scale(c, 1.0f / (float)f->n);
 }
 
-void obj_translate(Object *o, Vector3 d) {
+void ObjTranslate(Object *o, Vector3 d) {
     for (int i = 0; i < o->nverts; i++) o->verts[i].p = Vector3Add(o->verts[i].p, d);
     o->origin = Vector3Add(o->origin, d);
 }
 
-void obj_project_uv(Object *o, Face *f, float uv_scale) {
-    Vector3 n = obj_face_normal(o, f);
+void ObjProjectUV(Object *o, Face *f, float uv_scale) {
+    Vector3 n = ObjFaceNormal(o, f);
     float ax = fabsf(n.x), ay = fabsf(n.y), az = fabsf(n.z);
     float umin = 1e9f, vmin = 1e9f;
     for (int k = 0; k < f->n; k++) {
@@ -96,25 +96,25 @@ void obj_project_uv(Object *o, Face *f, float uv_scale) {
         f->uv[k] = (Vector2){ roundf(f->uv[k].x - umin), roundf(f->uv[k].y - vmin) };
 }
 
-void obj_clear_selection(Object *o) {
+void ObjClearSelection(Object *o) {
     for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
     for (int i = 0; i < o->nfaces; i++) o->faces[i].sel = false;
 }
 
-int obj_count_selected(const Object *o, bool faces) {
+int ObjCountSelected(const Object *o, bool faces) {
     int n = 0;
     if (faces) for (int i = 0; i < o->nfaces; i++) n += o->faces[i].sel;
     else       for (int i = 0; i < o->nverts; i++) n += o->verts[i].sel;
     return n;
 }
 
-Face *obj_first_selected_face(Object *o) {
+Face *ObjFirstSelectedFace(Object *o) {
     for (int i = 0; i < o->nfaces; i++)
         if (o->faces[i].sel) return &o->faces[i];
     return NULL;
 }
 
-void obj_remove_unused_verts(Object *o) {
+void ObjRemoveUnusedVerts(Object *o) {
     int *remap = calloc((size_t)o->nverts + 1, sizeof(int));
     for (int i = 0; i < o->nfaces; i++)
         for (int k = 0; k < o->faces[i].n; k++) remap[o->faces[i].v[k]] = 1;
@@ -134,26 +134,26 @@ void obj_remove_unused_verts(Object *o) {
     free(remap);
 }
 
-void obj_delete_selected_faces(Object *o) {
+void ObjDeleteSelectedFaces(Object *o) {
     int n = 0;
     for (int i = 0; i < o->nfaces; i++)
         if (!o->faces[i].sel) o->faces[n++] = o->faces[i];
     o->nfaces = n;
-    obj_remove_unused_verts(o);
+    ObjRemoveUnusedVerts(o);
 }
 
-void obj_delete_selected_verts(Object *o) {
+void ObjDeleteSelectedVerts(Object *o) {
     for (int i = 0; i < o->nfaces; i++) {
         Face *f = &o->faces[i];
         f->sel = false;
         for (int k = 0; k < f->n; k++)
             if (o->verts[f->v[k]].sel) { f->sel = true; break; }
     }
-    obj_delete_selected_faces(o);
+    ObjDeleteSelectedFaces(o);
     for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
 }
 
-static bool face_has_edge(const Face *f, int a, int b) {
+static bool FaceHasEdge(const Face *f, int a, int b) {
     for (int k = 0; k < f->n; k++) {
         int x = f->v[k], y = f->v[(k + 1) % f->n];
         if ((x == a && y == b) || (x == b && y == a)) return true;
@@ -161,7 +161,7 @@ static bool face_has_edge(const Face *f, int a, int b) {
     return false;
 }
 
-static void flip_face(Face *f) {
+static void FlipFace(Face *f) {
     for (int a = 0, b = f->n - 1; a < b; a++, b--) {
         int t = f->v[a]; f->v[a] = f->v[b]; f->v[b] = t;
         Vector2 u = f->uv[a]; f->uv[a] = f->uv[b]; f->uv[b] = u;
@@ -169,7 +169,7 @@ static void flip_face(Face *f) {
 }
 
 /* 선택된 면들을 한 덩어리로 돌출: 선택 영역의 바깥 경계에만 옆면을 만든다 */
-bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale) {
+bool ObjExtrudeSelectedFaces(Object *o, float dist, float uv_scale) {
     int nv = o->nverts, nf = o->nfaces;
     int *map = malloc(sizeof(int) * (size_t)(nv + 1));
     Vector3 acc = { 0 };
@@ -180,7 +180,7 @@ bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale) {
         Face *f = &o->faces[i];
         if (!f->sel) continue;
         any = true;
-        acc = Vector3Add(acc, obj_face_normal(o, f));
+        acc = Vector3Add(acc, ObjFaceNormal(o, f));
         for (int k = 0; k < f->n; k++) map[f->v[k]] = 0;
     }
     if (!any) { free(map); return false; }
@@ -190,19 +190,19 @@ bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale) {
     for (int i = 0; i < nv; i++) {
         if (map[i] < 0) continue;
         Vector3 p = Vector3Add(o->verts[i].p, off);
-        map[i] = obj_add_vert(o, p);
+        map[i] = ObjAddVert(o, p);
     }
 
     for (int i = 0; i < nf; i++) {
         if (!o->faces[i].sel) continue;
-        Face f = o->faces[i];   /* obj_add_face가 배열을 옮길 수 있으므로 복사 */
+        Face f = o->faces[i];   /* ObjAddFace가 배열을 옮길 수 있으므로 복사 */
         for (int k = 0; k < f.n; k++) {
             int a = f.v[k], b = f.v[(k + 1) % f.n];
             bool shared = false;
             for (int j = 0; j < nf && !shared; j++)
-                if (j != i && o->faces[j].sel && face_has_edge(&o->faces[j], a, b)) shared = true;
+                if (j != i && o->faces[j].sel && FaceHasEdge(&o->faces[j], a, b)) shared = true;
             if (shared) continue;
-            int fi = obj_add_face(o, (int[]){ a, b, map[b], map[a] }, 4, f.color);
+            int fi = ObjAddFace(o, (int[]){ a, b, map[b], map[a] }, 4, f.color);
             o->faces[fi].flags = f.flags;
         }
     }
@@ -213,14 +213,14 @@ bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale) {
         for (int k = 0; k < f->n; k++) f->v[k] = map[f->v[k]];
     }
     /* 옆면 uv는 새 위치 기준으로 투영 */
-    for (int i = nf; i < o->nfaces; i++) obj_project_uv(o, &o->faces[i], uv_scale);
+    for (int i = nf; i < o->nfaces; i++) ObjProjectUV(o, &o->faces[i], uv_scale);
     for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
-    obj_select_face_verts(o);
+    ObjSelectFaceVerts(o);
     free(map);
     return true;
 }
 
-bool obj_merge_selected_verts(Object *o) {
+bool ObjMergeSelectedVerts(Object *o) {
     Vector3 c = { 0 };
     int keep = -1, count = 0;
     for (int i = 0; i < o->nverts; i++) {
@@ -250,11 +250,11 @@ bool obj_merge_selected_verts(Object *o) {
     o->nfaces = nf;
     for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
     o->verts[keep].sel = true;
-    obj_remove_unused_verts(o);
+    ObjRemoveUnusedVerts(o);
     return true;
 }
 
-void obj_snap_selected_verts(Object *o, float g) {
+void ObjSnapSelectedVerts(Object *o, float g) {
     for (int i = 0; i < o->nverts; i++) {
         if (!o->verts[i].sel) continue;
         Vector3 *p = &o->verts[i].p;
@@ -262,20 +262,20 @@ void obj_snap_selected_verts(Object *o, float g) {
     }
 }
 
-static float *comp(Vector3 *v, int axis) {
+static float *Comp(Vector3 *v, int axis) {
     return axis == 0 ? &v->x : axis == 1 ? &v->y : &v->z;
 }
 
-void obj_mirror(Object *o, int axis) {
-    float c = *comp(&o->origin, axis);
+void ObjMirror(Object *o, int axis) {
+    float c = *Comp(&o->origin, axis);
     for (int i = 0; i < o->nverts; i++) {
-        float *p = comp(&o->verts[i].p, axis);
+        float *p = Comp(&o->verts[i].p, axis);
         *p = 2.0f * c - *p;
     }
-    for (int i = 0; i < o->nfaces; i++) flip_face(&o->faces[i]);
+    for (int i = 0; i < o->nfaces; i++) FlipFace(&o->faces[i]);
 }
 
-void obj_select_face_verts(Object *o) {
+void ObjSelectFaceVerts(Object *o) {
     for (int i = 0; i < o->nfaces; i++)
         if (o->faces[i].sel)
             for (int k = 0; k < o->faces[i].n; k++) o->verts[o->faces[i].v[k]].sel = true;
@@ -284,122 +284,122 @@ void obj_select_face_verts(Object *o) {
 /* ---- 기본 도형 ---- */
 
 /* 볼록 도형은 중심에서 바깥을 향하도록 면 방향을 맞춘다 */
-static void orient_outward(Object *o) {
+static void OrientOutward(Object *o) {
     Vector3 c = { 0 };
     for (int i = 0; i < o->nverts; i++) c = Vector3Add(c, o->verts[i].p);
     c = Vector3Scale(c, 1.0f / (float)o->nverts);
     for (int i = 0; i < o->nfaces; i++) {
         Face *f = &o->faces[i];
-        Vector3 d = Vector3Subtract(obj_face_center(o, f), c);
-        if (Vector3DotProduct(obj_face_normal(o, f), d) < 0) flip_face(f);
+        Vector3 d = Vector3Subtract(ObjFaceCenter(o, f), c);
+        if (Vector3DotProduct(ObjFaceNormal(o, f), d) < 0) FlipFace(f);
     }
 }
 
-static void add_ring(Object *o, int segs, float y, float r) {
+static void AddRing(Object *o, int segs, float y, float r) {
     for (int i = 0; i < segs; i++) {
         float a = 2.0f * PI * (float)i / (float)segs;
-        obj_add_vert(o, (Vector3){ cosf(a) * r, y, sinf(a) * r });
+        ObjAddVert(o, (Vector3){ cosf(a) * r, y, sinf(a) * r });
     }
 }
 
-static void build_shape(Object *o, int kind, Color color) {
+static void BuildShape(Object *o, int kind, Color color) {
     const float h = 0.5f;
     const int segs = 8;
     int ring[MAX_FACE_VERTS];
     switch (kind) {
     case PRIM_PLANE:
-        obj_add_vert(o, (Vector3){ -h, 0, -h });
-        obj_add_vert(o, (Vector3){  h, 0, -h });
-        obj_add_vert(o, (Vector3){  h, 0,  h });
-        obj_add_vert(o, (Vector3){ -h, 0,  h });
-        obj_add_face(o, (int[]){ 3, 2, 1, 0 }, 4, color);
+        ObjAddVert(o, (Vector3){ -h, 0, -h });
+        ObjAddVert(o, (Vector3){  h, 0, -h });
+        ObjAddVert(o, (Vector3){  h, 0,  h });
+        ObjAddVert(o, (Vector3){ -h, 0,  h });
+        ObjAddFace(o, (int[]){ 3, 2, 1, 0 }, 4, color);
         o->faces[0].flags |= FACE_DOUBLE;
         return;
     case PRIM_CUBE: {
         for (int y = 0; y < 2; y++) {
             float yy = y ? h : -h;
-            obj_add_vert(o, (Vector3){ -h, yy, -h });
-            obj_add_vert(o, (Vector3){  h, yy, -h });
-            obj_add_vert(o, (Vector3){  h, yy,  h });
-            obj_add_vert(o, (Vector3){ -h, yy,  h });
+            ObjAddVert(o, (Vector3){ -h, yy, -h });
+            ObjAddVert(o, (Vector3){  h, yy, -h });
+            ObjAddVert(o, (Vector3){  h, yy,  h });
+            ObjAddVert(o, (Vector3){ -h, yy,  h });
         }
         static const int f[6][4] = {
             { 7, 6, 5, 4 }, { 0, 1, 2, 3 }, { 3, 2, 6, 7 },
             { 1, 0, 4, 5 }, { 2, 1, 5, 6 }, { 0, 3, 7, 4 },
         };
-        for (int i = 0; i < 6; i++) obj_add_face(o, f[i], 4, color);
+        for (int i = 0; i < 6; i++) ObjAddFace(o, f[i], 4, color);
         return;
     }
     case PRIM_PRISM:
         for (int z = 0; z < 2; z++) {
             float zz = z ? h : -h;
-            obj_add_vert(o, (Vector3){ -h, -h, zz });
-            obj_add_vert(o, (Vector3){  h, -h, zz });
-            obj_add_vert(o, (Vector3){  0,  h, zz });
+            ObjAddVert(o, (Vector3){ -h, -h, zz });
+            ObjAddVert(o, (Vector3){  h, -h, zz });
+            ObjAddVert(o, (Vector3){  0,  h, zz });
         }
-        obj_add_face(o, (int[]){ 0, 1, 2 }, 3, color);
-        obj_add_face(o, (int[]){ 3, 4, 5 }, 3, color);
+        ObjAddFace(o, (int[]){ 0, 1, 2 }, 3, color);
+        ObjAddFace(o, (int[]){ 3, 4, 5 }, 3, color);
         for (int i = 0; i < 3; i++) {
             int j = (i + 1) % 3;
-            obj_add_face(o, (int[]){ i, j, j + 3, i + 3 }, 4, color);
+            ObjAddFace(o, (int[]){ i, j, j + 3, i + 3 }, 4, color);
         }
         break;
     case PRIM_PYRAMID:
-        obj_add_vert(o, (Vector3){ -h, -h, -h });
-        obj_add_vert(o, (Vector3){  h, -h, -h });
-        obj_add_vert(o, (Vector3){  h, -h,  h });
-        obj_add_vert(o, (Vector3){ -h, -h,  h });
-        obj_add_vert(o, (Vector3){  0,  h,  0 });
-        obj_add_face(o, (int[]){ 0, 1, 2, 3 }, 4, color);
-        for (int i = 0; i < 4; i++) obj_add_face(o, (int[]){ i, 4, (i + 1) % 4 }, 3, color);
+        ObjAddVert(o, (Vector3){ -h, -h, -h });
+        ObjAddVert(o, (Vector3){  h, -h, -h });
+        ObjAddVert(o, (Vector3){  h, -h,  h });
+        ObjAddVert(o, (Vector3){ -h, -h,  h });
+        ObjAddVert(o, (Vector3){  0,  h,  0 });
+        ObjAddFace(o, (int[]){ 0, 1, 2, 3 }, 4, color);
+        for (int i = 0; i < 4; i++) ObjAddFace(o, (int[]){ i, 4, (i + 1) % 4 }, 3, color);
         break;
     case PRIM_CYLINDER:
-        add_ring(o, segs, -h, h);
-        add_ring(o, segs, h, h);
+        AddRing(o, segs, -h, h);
+        AddRing(o, segs, h, h);
         for (int i = 0; i < segs; i++) {
             int j = (i + 1) % segs;
-            obj_add_face(o, (int[]){ i, j, segs + j, segs + i }, 4, color);
+            ObjAddFace(o, (int[]){ i, j, segs + j, segs + i }, 4, color);
             ring[i] = i;
         }
-        obj_add_face(o, ring, segs, color);
+        ObjAddFace(o, ring, segs, color);
         for (int i = 0; i < segs; i++) ring[i] = segs + i;
-        obj_add_face(o, ring, segs, color);
+        ObjAddFace(o, ring, segs, color);
         break;
     case PRIM_CONE: {
-        add_ring(o, segs, -h, h);
-        int apex = obj_add_vert(o, (Vector3){ 0, h, 0 });
+        AddRing(o, segs, -h, h);
+        int apex = ObjAddVert(o, (Vector3){ 0, h, 0 });
         for (int i = 0; i < segs; i++) {
-            obj_add_face(o, (int[]){ i, (i + 1) % segs, apex }, 3, color);
+            ObjAddFace(o, (int[]){ i, (i + 1) % segs, apex }, 3, color);
             ring[i] = i;
         }
-        obj_add_face(o, ring, segs, color);
+        ObjAddFace(o, ring, segs, color);
         break;
     }
     case PRIM_SPHERE: {
         const int rings = 6;
-        int top = obj_add_vert(o, (Vector3){ 0, h, 0 });
+        int top = ObjAddVert(o, (Vector3){ 0, h, 0 });
         for (int r = 1; r < rings; r++) {
             float phi = PI * (float)r / (float)rings;
-            add_ring(o, segs, cosf(phi) * h, sinf(phi) * h);
+            AddRing(o, segs, cosf(phi) * h, sinf(phi) * h);
         }
-        int bot = obj_add_vert(o, (Vector3){ 0, -h, 0 });
+        int bot = ObjAddVert(o, (Vector3){ 0, -h, 0 });
         #define RING(r, i) (1 + ((r) - 1) * segs + ((i) % segs))
         for (int i = 0; i < segs; i++) {
-            obj_add_face(o, (int[]){ top, RING(1, i + 1), RING(1, i) }, 3, color);
+            ObjAddFace(o, (int[]){ top, RING(1, i + 1), RING(1, i) }, 3, color);
             for (int r = 1; r < rings - 1; r++)
-                obj_add_face(o, (int[]){ RING(r, i), RING(r, i + 1), RING(r + 1, i + 1), RING(r + 1, i) }, 4, color);
-            obj_add_face(o, (int[]){ bot, RING(rings - 1, i), RING(rings - 1, i + 1) }, 3, color);
+                ObjAddFace(o, (int[]){ RING(r, i), RING(r, i + 1), RING(r + 1, i + 1), RING(r + 1, i) }, 4, color);
+            ObjAddFace(o, (int[]){ bot, RING(rings - 1, i), RING(rings - 1, i + 1) }, 3, color);
         }
         #undef RING
         break;
     }
     }
-    orient_outward(o);
+    OrientOutward(o);
 }
 
 /* 원통·원뿔·구의 옆면(앞쪽 면들)을 이음매 하나로 이어진 UV 한 덩어리로 펼친다.
    회전 전 기본 좌표 기준이고, 펼친 면 수를 돌려준다. 덩어리는 (0,0)부터 시작 */
-static int unwrap_sides(Object *o, int kind, float scale) {
+static int UnwrapSides(Object *o, int kind, float scale) {
     const float r = 0.5f;
     const int segs = 8, rings = 6;
     float sw = roundf(2.0f * PI * r * scale / (float)segs);   /* 한 칸 너비 */
@@ -453,10 +453,10 @@ static int unwrap_sides(Object *o, int kind, float scale) {
     return n;
 }
 
-void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex) {
-    build_shape(o, kind, color);
+void PrimBuild(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex) {
+    BuildShape(o, kind, color);
     float scale = tex->w / 8.0f;
-    int nwrap = unwrap_sides(o, kind, scale);
+    int nwrap = UnwrapSides(o, kind, scale);
 
     up = Vector3Normalize(up);
     Vector3 axis = Vector3CrossProduct((Vector3){ 0, 1, 0 }, up);
@@ -474,7 +474,7 @@ void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const 
     float x = 0, y = 0, row = 0;
     for (int i = 0; i < o->nfaces;) {
         int end = i < nwrap ? nwrap : i + 1;
-        if (i >= nwrap) obj_project_uv(o, &o->faces[i], scale);
+        if (i >= nwrap) ObjProjectUV(o, &o->faces[i], scale);
         float w = 0, h = 0;
         for (int j = i; j < end; j++)
             for (int k = 0; k < o->faces[j].n; k++) {
@@ -496,7 +496,7 @@ void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const 
 
 /* ---- 텍스처 버퍼 ---- */
 
-TexBuf *texbuf_new(int w, int h) {
+TexBuf *TexBufNew(int w, int h) {
     TexBuf *t = calloc(1, sizeof(TexBuf) + sizeof(Color) * (size_t)w * (size_t)h);
     if (!t) { fprintf(stderr, "out of memory\n"); exit(1); }
     t->refs = 1;
@@ -505,55 +505,55 @@ TexBuf *texbuf_new(int w, int h) {
     return t;
 }
 
-void texbuf_release(TexBuf *t) {
+void TexBufRelease(TexBuf *t) {
     if (t && --t->refs == 0) free(t);
 }
 
-static size_t texbuf_bytes(const TexBuf *t) {
+static size_t TexBufBytes(const TexBuf *t) {
     return t ? sizeof(Color) * (size_t)t->w * (size_t)t->h : 0;
 }
 
-void scene_reset_palette(Scene *s) {
+void SceneResetPalette(Scene *s) {
     memcpy(s->palette, DEFAULT_PALETTE, sizeof DEFAULT_PALETTE);
     s->npalette = 16;
     s->bg = DEFAULT_PALETTE[1];
 }
 
-void scene_init(Scene *s) {
+void SceneInit(Scene *s) {
     memset(s, 0, sizeof *s);
     s->active = -1;
-    scene_reset_palette(s);
+    SceneResetPalette(s);
     /* 8픽셀 체크무늬: UV 위치가 잘 보이도록 */
-    s->tex = texbuf_new(128, 128);
+    s->tex = TexBufNew(128, 128);
     for (int y = 0; y < 128; y++)
         for (int x = 0; x < 128; x++)
             s->tex->px[y * 128 + x] = DEFAULT_PALETTE[((x / 8 + y / 8) & 1) ? 6 : 7];
 }
 
-float scene_uv_scale(const Scene *s) {
+float SceneUVScale(const Scene *s) {
     return s->tex->w / 8.0f;
 }
 
-Color *scene_tex_mut(Scene *s) {
+Color *SceneTexMut(Scene *s) {
     if (s->tex->refs > 1) {
-        TexBuf *t = texbuf_new(s->tex->w, s->tex->h);
-        memcpy(t->px, s->tex->px, texbuf_bytes(t));
-        texbuf_release(s->tex);
+        TexBuf *t = TexBufNew(s->tex->w, s->tex->h);
+        memcpy(t->px, s->tex->px, TexBufBytes(t));
+        TexBufRelease(s->tex);
         s->tex = t;
     }
     return s->tex->px;
 }
 
-void scene_resize_tex(Scene *s, int w, int h) {
-    TexBuf *t = texbuf_new(w, h);
+void SceneResizeTex(Scene *s, int w, int h) {
+    TexBuf *t = TexBufNew(w, h);
     int cw = w < s->tex->w ? w : s->tex->w, ch = h < s->tex->h ? h : s->tex->h;
     for (int y = 0; y < ch; y++)
         memcpy(&t->px[y * w], &s->tex->px[y * s->tex->w], sizeof(Color) * (size_t)cw);
-    texbuf_release(s->tex);
+    TexBufRelease(s->tex);
     s->tex = t;
 }
 
-Object *scene_add(Scene *s, const char *name) {
+Object *SceneAdd(Scene *s, const char *name) {
     if (s->count >= MAX_OBJECTS) return NULL;
     Object *o = &s->objs[s->count++];
     memset(o, 0, sizeof *o);
@@ -561,29 +561,29 @@ Object *scene_add(Scene *s, const char *name) {
     return o;
 }
 
-void scene_delete(Scene *s, int i) {
-    obj_free(&s->objs[i]);
+void SceneDelete(Scene *s, int i) {
+    ObjFree(&s->objs[i]);
     memmove(&s->objs[i], &s->objs[i + 1], sizeof(Object) * (size_t)(s->count - i - 1));
     s->count--;
     if (s->active == i) s->active = -1;
     else if (s->active > i) s->active--;
 }
 
-void scene_clear(Scene *s) {
-    for (int i = 0; i < s->count; i++) obj_free(&s->objs[i]);
+void SceneClear(Scene *s) {
+    for (int i = 0; i < s->count; i++) ObjFree(&s->objs[i]);
     s->count = 0;
     s->active = -1;
 }
 
-void scene_release(Scene *s) {
-    scene_clear(s);
-    texbuf_release(s->tex);
+void SceneRelease(Scene *s) {
+    SceneClear(s);
+    TexBufRelease(s->tex);
     s->tex = NULL;
 }
 
-void scene_copy(Scene *dst, const Scene *src) {
+void SceneCopy(Scene *dst, const Scene *src) {
     memcpy(dst, src, sizeof *dst);
-    for (int i = 0; i < src->count; i++) obj_copy(&dst->objs[i], &src->objs[i]);
+    for (int i = 0; i < src->count; i++) ObjCopy(&dst->objs[i], &src->objs[i]);
     dst->tex->refs++;
 }
 
@@ -594,46 +594,46 @@ void scene_copy(Scene *dst, const Scene *src) {
 static Scene g_past[UNDO_MAX], g_future[UNDO_MAX];
 static int g_npast, g_nfuture;
 
-static void drop_oldest(void) {
-    scene_release(&g_past[0]);
+static void DropOldest(void) {
+    SceneRelease(&g_past[0]);
     memmove(&g_past[0], &g_past[1], sizeof(Scene) * (size_t)(g_npast - 1));
     g_npast--;
 }
 
 /* 서로 다른 텍스처 버퍼만 센다 (연속된 기록은 같은 버퍼를 공유하는 경우가 많음) */
-static size_t history_tex_bytes(void) {
+static size_t HistoryTexBytes(void) {
     size_t total = 0;
     for (int i = 0; i < g_npast; i++) {
         bool seen = false;
         for (int j = 0; j < i && !seen; j++) seen = g_past[j].tex == g_past[i].tex;
-        if (!seen) total += texbuf_bytes(g_past[i].tex);
+        if (!seen) total += TexBufBytes(g_past[i].tex);
     }
     return total;
 }
 
-void undo_push(const Scene *s) {
-    if (g_npast == UNDO_MAX) drop_oldest();
-    scene_copy(&g_past[g_npast++], s);
-    while (g_nfuture) scene_release(&g_future[--g_nfuture]);
+void UndoPush(const Scene *s) {
+    if (g_npast == UNDO_MAX) DropOldest();
+    SceneCopy(&g_past[g_npast++], s);
+    while (g_nfuture) SceneRelease(&g_future[--g_nfuture]);
     /* 큰 텍스처를 여러 번 고치면 메모리가 커지므로 오래된 기록부터 버림 */
-    while (g_npast > 1 && history_tex_bytes() > UNDO_TEX_BYTES) drop_oldest();
+    while (g_npast > 1 && HistoryTexBytes() > UNDO_TEX_BYTES) DropOldest();
 }
 
-bool undo_undo(Scene *s) {
+bool UndoUndo(Scene *s) {
     if (!g_npast) return false;
     g_future[g_nfuture++] = *s;
     *s = g_past[--g_npast];
     return true;
 }
 
-bool undo_redo(Scene *s) {
+bool UndoRedo(Scene *s) {
     if (!g_nfuture) return false;
     g_past[g_npast++] = *s;
     *s = g_future[--g_nfuture];
     return true;
 }
 
-void undo_reset(void) {
-    while (g_npast) scene_release(&g_past[--g_npast]);
-    while (g_nfuture) scene_release(&g_future[--g_nfuture]);
+void UndoReset(void) {
+    while (g_npast) SceneRelease(&g_past[--g_npast]);
+    while (g_nfuture) SceneRelease(&g_future[--g_nfuture]);
 }

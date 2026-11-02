@@ -12,7 +12,7 @@ static const FilePathList *g_sort_list;
 static char g_drives[26];
 static int g_ndrives;
 
-static void normalize(char *p) {
+static void NormalizePath(char *p) {
     for (char *c = p; *c; c++)
         if (*c == '\\') *c = '/';
     size_t n = strlen(p);
@@ -20,17 +20,17 @@ static void normalize(char *p) {
     while (n > 1 && p[n - 1] == '/' && !(n == 3 && p[1] == ':')) p[--n] = '\0';
 }
 
-static bool is_root(const char *p) {
+static bool IsRoot(const char *p) {
     return strcmp(p, "/") == 0 || (strlen(p) == 3 && p[1] == ':' && p[2] == '/');
 }
 
-static void join(char *out, size_t size, const char *dir, const char *name) {
+static void Join(char *out, size_t size, const char *dir, const char *name) {
     size_t n = strlen(dir);
     snprintf(out, size, "%s%s%s", dir, (n && dir[n - 1] == '/') ? "" : "/", name);
 }
 
-static void parent(char *dir) {
-    if (is_root(dir)) return;
+static void Parent(char *dir) {
+    if (IsRoot(dir)) return;
     char *s = strrchr(dir, '/');
     if (!s) return;
     if (s == dir) dir[1] = '\0';                        /* "/home" → "/" */
@@ -38,20 +38,20 @@ static void parent(char *dir) {
     else *s = '\0';
 }
 
-static const char *base(const char *path) {
+static const char *Base(const char *path) {
     const char *s = strrchr(path, '/');
     return s ? s + 1 : path;
 }
 
-static bool is_dir_entry(const char *path) {
+static bool IsDirEntry(const char *path) {
     return !IsPathFile(path);
 }
 
-static int cmp_entries(const void *pa, const void *pb) {
+static int CmpEntries(const void *pa, const void *pb) {
     const char *a = g_sort_list->paths[*(const int *)pa], *b = g_sort_list->paths[*(const int *)pb];
-    bool da = is_dir_entry(a), db = is_dir_entry(b);
+    bool da = IsDirEntry(a), db = IsDirEntry(b);
     if (da != db) return da ? -1 : 1;
-    const char *x = base(a), *y = base(b);
+    const char *x = Base(a), *y = Base(b);
     for (; *x && *y; x++, y++) {
         int d = tolower((unsigned char)*x) - tolower((unsigned char)*y);
         if (d) return d;
@@ -59,7 +59,7 @@ static int cmp_entries(const void *pa, const void *pb) {
     return (unsigned char)*x - (unsigned char)*y;
 }
 
-static void unload(FileBrowser *fb) {
+static void Unload(FileBrowser *fb) {
     if (fb->listed) UnloadDirectoryFiles(fb->list);
     fb->listed = false;
     free(g_order);
@@ -67,34 +67,34 @@ static void unload(FileBrowser *fb) {
     g_count = 0;
 }
 
-static void refresh(FileBrowser *fb) {
-    unload(fb);
+static void Refresh(FileBrowser *fb) {
+    Unload(fb);
     fb->list = LoadDirectoryFiles(fb->dir);
     fb->listed = true;
-    for (unsigned i = 0; i < fb->list.count; i++) normalize(fb->list.paths[i]);
+    for (unsigned i = 0; i < fb->list.count; i++) NormalizePath(fb->list.paths[i]);
 
     g_order = malloc(sizeof(int) * (fb->list.count + 1));
     for (unsigned i = 0; i < fb->list.count; i++) {
         const char *p = fb->list.paths[i];
-        if (base(p)[0] == '.') continue;                       /* 숨김 파일 */
+        if (Base(p)[0] == '.') continue;                       /* 숨김 파일 */
         /* 폴더 고르기 모드(ext가 빈 문자열)면 폴더만 */
-        if (!is_dir_entry(p) && (!fb->ext[0] || !IsFileExtension(p, fb->ext))) continue;
+        if (!IsDirEntry(p) && (!fb->ext[0] || !IsFileExtension(p, fb->ext))) continue;
         g_order[g_count++] = (int)i;
     }
     g_sort_list = &fb->list;
-    qsort(g_order, (size_t)g_count, sizeof(int), cmp_entries);
+    qsort(g_order, (size_t)g_count, sizeof(int), CmpEntries);
     fb->selected = -1;
     fb->confirm = false;
 }
 
-static void set_dir(FileBrowser *fb, const char *dir) {
+static void SetDir(FileBrowser *fb, const char *dir) {
     snprintf(fb->dir, sizeof fb->dir, "%s", dir);
-    normalize(fb->dir);
-    refresh(fb);
+    NormalizePath(fb->dir);
+    Refresh(fb);
 }
 
-void fb_open(FileBrowser *fb, int action, const char *title, const char *ext, bool save, const char *start) {
-    unload(fb);
+void FbOpen(FileBrowser *fb, int action, const char *title, const char *ext, bool save, const char *start) {
+    Unload(fb);
     fb->open = true;
     fb->save = save;
     fb->action = action;
@@ -105,15 +105,15 @@ void fb_open(FileBrowser *fb, int action, const char *title, const char *ext, bo
 
     char p[512];
     snprintf(p, sizeof p, "%s", start ? start : GetWorkingDirectory());
-    normalize(p);
+    NormalizePath(p);
     if (!DirectoryExists(p) || (save && !ext[0])) {   /* 폴더 고르기는 그 폴더 이름을 기본값으로 */
         /* 파일 경로: 폴더는 그 위치, 이름은 저장할 때 기본값으로 */
-        if (save) snprintf(fb->name, sizeof fb->name, "%s", base(p));
-        parent(p);
+        if (save) snprintf(fb->name, sizeof fb->name, "%s", Base(p));
+        Parent(p);
     }
     if (!DirectoryExists(p)) {
         snprintf(p, sizeof p, "%s", GetWorkingDirectory());
-        normalize(p);
+        NormalizePath(p);
     }
 
     g_ndrives = 0;
@@ -123,24 +123,24 @@ void fb_open(FileBrowser *fb, int action, const char *title, const char *ext, bo
         if (DirectoryExists(d)) g_drives[g_ndrives++] = c;
     }
 #endif
-    set_dir(fb, p);
+    SetDir(fb, p);
 }
 
-void fb_close(FileBrowser *fb) {
-    unload(fb);
+void FbClose(FileBrowser *fb) {
+    Unload(fb);
     fb->open = false;
 }
 
 /* 확정 시도. 결과 경로가 정해지면 true */
-static bool submit(FileBrowser *fb, char *out, size_t size) {
+static bool Submit(FileBrowser *fb, char *out, size_t size) {
     if (!fb->name[0]) return false;
     char full[1024];
     char typed[256];
     snprintf(typed, sizeof typed, "%s", fb->name);
-    normalize(typed);
+    NormalizePath(typed);
     /* 경로를 통째로 입력해도 됨 */
     if (typed[0] == '/' || (typed[0] && typed[1] == ':')) snprintf(full, sizeof full, "%s", typed);
-    else join(full, sizeof full, fb->dir, typed);
+    else Join(full, sizeof full, fb->dir, typed);
 
     if (!fb->ext[0]) {
         /* 폴더 고르기: 이름이 곧 결과 폴더. 이미 있으면 안의 파일을 덮어쓸지 확인 */
@@ -149,11 +149,11 @@ static bool submit(FileBrowser *fb, char *out, size_t size) {
             return false;
         }
         snprintf(out, size, "%s", full);
-        fb_close(fb);
+        FbClose(fb);
         return true;
     }
     if (DirectoryExists(full)) {
-        set_dir(fb, full);
+        SetDir(fb, full);
         fb->name[0] = '\0';
         return false;
     }
@@ -168,19 +168,19 @@ static bool submit(FileBrowser *fb, char *out, size_t size) {
         return false;
     }
     snprintf(out, size, "%s", full);
-    fb_close(fb);
+    FbClose(fb);
     return true;
 }
 
-bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
+bool FbUpdate(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     if (!fb->open) return false;
-    if (IsKeyPressed(KEY_ESCAPE)) { fb_close(fb); return false; }
+    if (IsKeyPressed(KEY_ESCAPE)) { FbClose(fb); return false; }
 
     int W = GetScreenWidth(), H = GetScreenHeight();
     mu_Rect r = mu_rect(W / 2 - 320, H / 2 - 250, 640, 500);
     bool closed;
-    if (!ui_begin_window(ctx, "files", r, MU_OPT_NORESIZE, &closed)) {
-        if (closed) fb_close(fb);
+    if (!UIBeginWindow(ctx, "files", r, MU_OPT_NORESIZE, &closed)) {
+        if (closed) FbClose(fb);
         return false;
     }
     mu_bring_to_front(ctx, mu_get_current_container(ctx));
@@ -196,15 +196,15 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     for (int i = 0; i < g_ndrives && n < 30; i++) widths[n++] = 36;
     widths[n++] = -1;
     mu_layout_row(ctx, n, widths, 0);
-    if (mu_button(ctx, "up")) { char d[512]; snprintf(d, sizeof d, "%s", fb->dir); parent(d); set_dir(fb, d); }
+    if (mu_button(ctx, "up")) { char d[512]; snprintf(d, sizeof d, "%s", fb->dir); Parent(d); SetDir(fb, d); }
     if (mu_button(ctx, "home")) {
         const char *h = getenv("USERPROFILE");
         if (!h) h = getenv("HOME");
-        if (h && DirectoryExists(h)) set_dir(fb, h);
+        if (h && DirectoryExists(h)) SetDir(fb, h);
     }
     for (int i = 0; i < g_ndrives && i < 28; i++) {
         char label[4] = { g_drives[i], ':', '\0' };
-        if (mu_button(ctx, label)) { char d[4] = { g_drives[i], ':', '/', '\0' }; set_dir(fb, d); }
+        if (mu_button(ctx, label)) { char d[4] = { g_drives[i], ':', '/', '\0' }; SetDir(fb, d); }
     }
     size_t len = strlen(fb->dir);
     mu_label(ctx, len > 34 ? fb->dir + len - 34 : fb->dir);
@@ -217,15 +217,15 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     for (int k = 0; k < g_count && fb->listed; k++) {
         int i = g_order[k];
         const char *p = fb->list.paths[i];
-        bool dir = is_dir_entry(p);
+        bool dir = IsDirEntry(p);
         char label[300];
-        snprintf(label, sizeof label, "%s%s%s", k == fb->selected ? "> " : "  ", base(p), dir ? "/" : "");
+        snprintf(label, sizeof label, "%s%s%s", k == fb->selected ? "> " : "  ", Base(p), dir ? "/" : "");
         mu_push_id(ctx, &k, sizeof k);
         if (mu_button_ex(ctx, label, 0, 0)) {
             if (dir) {
                 char d[512];
                 snprintf(d, sizeof d, "%s", p);
-                set_dir(fb, d);
+                SetDir(fb, d);
                 mu_pop_id(ctx);
                 break;                     /* 목록이 바뀌었으니 이번 프레임은 여기까지 */
             }
@@ -234,8 +234,8 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
             fb->last_index = k;
             fb->last_click = GetTime();
             fb->confirm = false;
-            snprintf(fb->name, sizeof fb->name, "%s", base(p));
-            if (dbl) done = submit(fb, out, size);
+            snprintf(fb->name, sizeof fb->name, "%s", Base(p));
+            if (dbl) done = Submit(fb, out, size);
         }
         mu_pop_id(ctx);
         if (done) break;
@@ -245,22 +245,22 @@ bool fb_update(FileBrowser *fb, mu_Context *ctx, char *out, size_t size) {
     if (!done && fb->open) {
         mu_layout_row(ctx, 2, (int[]){ 60, -1 }, 0);
         mu_label(ctx, "name");
-        int res = ui_textbox(ctx, fb->name, sizeof fb->name);
+        int res = UITextbox(ctx, fb->name, sizeof fb->name);
         if (res & MU_RES_CHANGE) fb->confirm = false;     /* 이름을 고치면 덮어쓰기 확인 해제 */
-        if (res & MU_RES_SUBMIT) done = submit(fb, out, size);
+        if (res & MU_RES_SUBMIT) done = Submit(fb, out, size);
     }
     if (!done && fb->open) {
         mu_layout_row(ctx, 3, (int[]){ 300, 150, -1 }, 0);
         if (fb->confirm) {
             mu_label(ctx, fb->ext[0] ? "file exists. overwrite?" : "folder exists. overwrite?");
-            if (mu_button(ctx, "overwrite")) done = submit(fb, out, size);
+            if (mu_button(ctx, "overwrite")) done = Submit(fb, out, size);
             if (mu_button(ctx, "no")) fb->confirm = false;
         } else {
             mu_label(ctx, "");
-            if (mu_button(ctx, !fb->ext[0] ? "ok" : fb->save ? "save" : "open")) done = submit(fb, out, size);
-            if (mu_button(ctx, "cancel")) fb_close(fb);
+            if (mu_button(ctx, !fb->ext[0] ? "ok" : fb->save ? "save" : "open")) done = Submit(fb, out, size);
+            if (mu_button(ctx, "cancel")) FbClose(fb);
         }
     }
-    ui_end_window(ctx);
+    UIEndWindow(ctx);
     return done;
 }

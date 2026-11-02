@@ -60,49 +60,49 @@ typedef struct {
 
 extern const Color DEFAULT_PALETTE[16];
 
-TexBuf *texbuf_new(int w, int h);           /* 투명으로 채움 */
-void    texbuf_release(TexBuf *t);
+TexBuf *TexBufNew(int w, int h);           /* 투명으로 채움 */
+void    TexBufRelease(TexBuf *t);
 
-int     obj_add_vert(Object *o, Vector3 p);
-int     obj_add_face(Object *o, const int *idx, int n, Color color);
-void    obj_free(Object *o);
-void    obj_copy(Object *dst, const Object *src);
-Vector3 obj_face_normal(const Object *o, const Face *f);
-Vector3 obj_face_center(const Object *o, const Face *f);
-void    obj_translate(Object *o, Vector3 d);
-void    obj_project_uv(Object *o, Face *f, float uv_scale);   /* 법선 주축 방향 평면 투영 */
-void    obj_clear_selection(Object *o);
-int     obj_count_selected(const Object *o, bool faces);   /* 골라진 면(faces) 또는 정점 개수 */
-Face   *obj_first_selected_face(Object *o);                /* 없으면 NULL */
+int     ObjAddVert(Object *o, Vector3 p);
+int     ObjAddFace(Object *o, const int *idx, int n, Color color);
+void    ObjFree(Object *o);
+void    ObjCopy(Object *dst, const Object *src);
+Vector3 ObjFaceNormal(const Object *o, const Face *f);
+Vector3 ObjFaceCenter(const Object *o, const Face *f);
+void    ObjTranslate(Object *o, Vector3 d);
+void    ObjProjectUV(Object *o, Face *f, float uv_scale);   /* 법선 주축 방향 평면 투영 */
+void    ObjClearSelection(Object *o);
+int     ObjCountSelected(const Object *o, bool faces);   /* 골라진 면(faces) 또는 정점 개수 */
+Face   *ObjFirstSelectedFace(Object *o);                /* 없으면 NULL */
 
-void obj_remove_unused_verts(Object *o);
-void obj_delete_selected_faces(Object *o);
-void obj_delete_selected_verts(Object *o);
-bool obj_extrude_selected_faces(Object *o, float dist, float uv_scale);
-bool obj_merge_selected_verts(Object *o);
-void obj_snap_selected_verts(Object *o, float grid);
-void obj_mirror(Object *o, int axis);
-void obj_select_face_verts(Object *o);
+void ObjRemoveUnusedVerts(Object *o);
+void ObjDeleteSelectedFaces(Object *o);
+void ObjDeleteSelectedVerts(Object *o);
+bool ObjExtrudeSelectedFaces(Object *o, float dist, float uv_scale);
+bool ObjMergeSelectedVerts(Object *o);
+void ObjSnapSelectedVerts(Object *o, float grid);
+void ObjMirror(Object *o, int axis);
+void ObjSelectFaceVerts(Object *o);
 
 enum { PRIM_PLANE, PRIM_CUBE, PRIM_PRISM, PRIM_PYRAMID, PRIM_CYLINDER, PRIM_CONE, PRIM_SPHERE, PRIM_COUNT };
 extern const char *PRIM_NAMES[PRIM_COUNT];
 /* 중심이 원점, +Y가 up 방향을 향하도록 만든 뒤 at으로 옮기고, 텍스처 안에 UV를 펼쳐 놓음 */
-void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex);
+void PrimBuild(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex);
 
-void    scene_init(Scene *s);                 /* 빈 씬 + 기본 팔레트/텍스처 (s는 비어 있어야 함) */
-void    scene_reset_palette(Scene *s);
-Object *scene_add(Scene *s, const char *name);
-void    scene_delete(Scene *s, int i);
-void    scene_clear(Scene *s);                /* 오브젝트만 해제 */
-void    scene_release(Scene *s);              /* 오브젝트 + 텍스처 해제 */
-void    scene_copy(Scene *dst, const Scene *src);
-float   scene_uv_scale(const Scene *s);       /* 월드 1단위당 텍스처 픽셀 (기본 투영용) */
-Color  *scene_tex_mut(Scene *s);              /* 텍스처를 고치기 전에: 공유 중이면 복사 */
-void    scene_resize_tex(Scene *s, int w, int h);   /* 왼쪽 위 기준으로 자르거나 늘림 */
+void    SceneInit(Scene *s);                 /* 빈 씬 + 기본 팔레트/텍스처 (s는 비어 있어야 함) */
+void    SceneResetPalette(Scene *s);
+Object *SceneAdd(Scene *s, const char *name);
+void    SceneDelete(Scene *s, int i);
+void    SceneClear(Scene *s);                /* 오브젝트만 해제 */
+void    SceneRelease(Scene *s);              /* 오브젝트 + 텍스처 해제 */
+void    SceneCopy(Scene *dst, const Scene *src);
+float   SceneUVScale(const Scene *s);       /* 월드 1단위당 텍스처 픽셀 (기본 투영용) */
+Color  *SceneTexMut(Scene *s);              /* 텍스처를 고치기 전에: 공유 중이면 복사 */
+void    SceneResizeTex(Scene *s, int w, int h);   /* 왼쪽 위 기준으로 자르거나 늘림 */
 
-void undo_push(const Scene *s);
-bool undo_undo(Scene *s);
-bool undo_redo(Scene *s);
-void undo_reset(void);
+void UndoPush(const Scene *s);
+bool UndoUndo(Scene *s);
+bool UndoRedo(Scene *s);
+void UndoReset(void);
 
 #endif

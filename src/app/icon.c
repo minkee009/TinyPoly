@@ -1,4 +1,4 @@
-#include "app/icon.h"
+#include "app/window.h"
 #include <raylib.h>
 
 /* 앱 아이콘: 도트 아이소메트릭 큐브 (16x16).
@@ -26,7 +26,7 @@ static const char *const ICON_ART[16] = {
     /* ICON_ART_END */
 };
 
-static Color icon_color(char ch) {
+static Color IconColor(char ch) {
     switch (ch) {
     case 'K': return (Color){ 24, 20, 36, 255 };
     case 'H': return (Color){ 255, 244, 200, 255 };
@@ -39,13 +39,13 @@ static Color icon_color(char ch) {
     }
 }
 
-void app_set_icon(void) {
+void AppSetIcon(void) {
     /* 32x32로 키워서 창 아이콘에 (macOS는 창 아이콘이 없어서 무시됨) */
     const int s = 2;
     Image img = GenImageColor(16 * s, 16 * s, BLANK);
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
-            ImageDrawRectangle(&img, x * s, y * s, s, s, icon_color(ICON_ART[y][x]));
+            ImageDrawRectangle(&img, x * s, y * s, s, s, IconColor(ICON_ART[y][x]));
     SetWindowIcon(img);
     UnloadImage(img);
 }

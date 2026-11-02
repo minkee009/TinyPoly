@@ -6,26 +6,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-static float font_size(void) {
+static float FontSize(void) {
     return (float)(GetFontDefault().baseSize * UI_FONT_SCALE);
 }
 
-static int text_width(mu_Font font, const char *text, int len) {
+static int TextWidth(mu_Font font, const char *text, int len) {
     (void)font;
     char buf[1024];
     if (len < 0) len = (int)strlen(text);
     if (len >= (int)sizeof buf) len = (int)sizeof buf - 1;
     memcpy(buf, text, (size_t)len);
     buf[len] = '\0';
-    return (int)MeasureTextEx(GetFontDefault(), buf, font_size(), (float)UI_FONT_SCALE).x;
+    return (int)MeasureTextEx(GetFontDefault(), buf, FontSize(), (float)UI_FONT_SCALE).x;
 }
 
-static int text_height(mu_Font font) {
+static int TextHeight(mu_Font font) {
     (void)font;
-    return (int)font_size();
+    return (int)FontSize();
 }
 
-static Color to_color(mu_Color c) {
+static Color ToColor(mu_Color c) {
     return (Color){ c.r, c.g, c.b, c.a };
 }
 
@@ -34,7 +34,7 @@ static Color to_color(mu_Color c) {
 
 #define PX UI_FONT_SCALE
 
-static int round_bands(int x, int y, int w, int h, int rad, bool square_bottom, int out[][4]) {
+static int RoundBands(int x, int y, int w, int h, int rad, bool square_bottom, int out[][4]) {
     while (rad > 0 && (w < rad * PX * 3 || h < rad * PX * 3)) rad--;
     int n = 0, top = rad * PX, bot = square_bottom ? 0 : rad * PX;
     for (int i = 0; i < rad; i++) {
@@ -48,36 +48,36 @@ static int round_bands(int x, int y, int w, int h, int rad, bool square_bottom, 
     return n;
 }
 
-static void mu_round_rect(mu_Context *ctx, mu_Rect r, mu_Color c, int rad, bool square_bottom) {
-    int b[8][4], n = round_bands(r.x, r.y, r.w, r.h, rad, square_bottom, b);
+static void MuRoundRect(mu_Context *ctx, mu_Rect r, mu_Color c, int rad, bool square_bottom) {
+    int b[8][4], n = RoundBands(r.x, r.y, r.w, r.h, rad, square_bottom, b);
     for (int i = 0; i < n; i++) mu_draw_rect(ctx, mu_rect(b[i][0], b[i][1], b[i][2], b[i][3]), c);
 }
 
-static void fill_round(Rectangle r, Color c, int rad) {
-    int b[8][4], n = round_bands((int)r.x, (int)r.y, (int)r.width, (int)r.height, rad, false, b);
+static void FillRound(Rectangle r, Color c, int rad) {
+    int b[8][4], n = RoundBands((int)r.x, (int)r.y, (int)r.width, (int)r.height, rad, false, b);
     for (int i = 0; i < n; i++) DrawRectangle(b[i][0], b[i][1], b[i][2], b[i][3], c);
 }
 
 /* microui의 기본 테두리/배경 대신. 테두리는 한 칸 두께의 도트 원호 (바깥 rad 2, 안쪽 rad 1).
    창 제목줄은 아래쪽 모서리를 깎지 않음 (창 몸통과 이어지도록) */
-static void draw_frame(mu_Context *ctx, mu_Rect rect, int colorid) {
+static void DrawFrame(mu_Context *ctx, mu_Rect rect, int colorid) {
     bool title = colorid == MU_COLOR_TITLEBG;
     bool bordered = !title && colorid != MU_COLOR_SCROLLBASE && colorid != MU_COLOR_SCROLLTHUMB;
     mu_Color border = ctx->style->colors[MU_COLOR_BORDER];
     if (bordered && border.a) {
         mu_Rect o = mu_rect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
-        mu_round_rect(ctx, o, border, 2, false);
-        mu_round_rect(ctx, mu_rect(o.x + PX, o.y + PX, o.w - PX * 2, o.h - PX * 2), ctx->style->colors[colorid], 1, false);
+        MuRoundRect(ctx, o, border, 2, false);
+        MuRoundRect(ctx, mu_rect(o.x + PX, o.y + PX, o.w - PX * 2, o.h - PX * 2), ctx->style->colors[colorid], 1, false);
         return;
     }
-    mu_round_rect(ctx, rect, ctx->style->colors[colorid], 2, title);
+    MuRoundRect(ctx, rect, ctx->style->colors[colorid], 2, title);
 }
 
-void ui_fill_round(Rectangle r, Color c) {
-    fill_round(r, c, 2);
+void UIFillRound(Rectangle r, Color c) {
+    FillRound(r, c, 2);
 }
 
-void ui_checker(Rectangle r, int block) {
+void UIChecker(Rectangle r, int block) {
     for (int y = 0; y < (int)r.height; y += block)
         for (int x = 0; x < (int)r.width; x += block) {
             int w = (int)r.width - x < block ? (int)r.width - x : block;
@@ -91,7 +91,7 @@ void ui_checker(Rectangle r, int block) {
 
 static bool g_resizable;   /* 창은 겹쳐 열지 않으므로 하나면 충분 */
 
-bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, bool *closed) {
+bool UIBeginWindow(mu_Context *ctx, const char *title, mu_Rect rect, int opt, bool *closed) {
     *closed = false;
     mu_Container *cnt = mu_get_container(ctx, title);
     if (!cnt->open) {        /* 지난 프레임에 X를 누름: 다음에 다시 열 수 있게 되돌려 둠 */
@@ -103,7 +103,7 @@ bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, 
     return mu_begin_window_ex(ctx, title, rect, opt) != 0;
 }
 
-void ui_end_window(mu_Context *ctx) {
+void UIEndWindow(mu_Context *ctx) {
     if (g_resizable) {
         /* 몸통 clip을 잠시 빼고 오른쪽 아래 모서리에 흐린 점 삼각형 (스크롤바 위에 그려지도록 맨 끝에) */
         mu_pop_clip_rect(ctx);
@@ -121,11 +121,11 @@ void ui_end_window(mu_Context *ctx) {
     mu_end_window(ctx);
 }
 
-void ui_init(mu_Context *ctx) {
+void UIInit(mu_Context *ctx) {
     mu_init(ctx);
-    ctx->text_width = text_width;
-    ctx->text_height = text_height;
-    ctx->draw_frame = draw_frame;
+    ctx->text_width = TextWidth;
+    ctx->text_height = TextHeight;
+    ctx->draw_frame = DrawFrame;
     ctx->style->size.y = 16;
     ctx->style->padding = 4;
     ctx->style->spacing = 3;
@@ -545,7 +545,7 @@ static const char *ICON_ART[UI_ICON_END - UI_ICON_FOLDER][10] = {
     },
 };
 
-static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
+static void DrawPixelIcon(int id, mu_Rect rect, Color c) {
     const char *const *rows = ICON_ART[id - UI_ICON_FOLDER];
     const int s = UI_FONT_SCALE;
     const Color accent = { 255, 200, 60, c.a };   /* 흐린 버튼이면 강조색도 같이 흐리게 */
@@ -565,7 +565,7 @@ static void draw_pixel_icon(int id, mu_Rect rect, Color c) {
 }
 
 /* 색 선택 창의 그라데이션들 (microui 아이콘 명령을 빌려 그리는 순서를 지킴) */
-static void draw_gfx(int id, mu_Rect r, Color c) {
+static void DrawGfx(int id, mu_Rect r, Color c) {
     int x = r.x, y = r.y, w = r.w, h = r.h;
     if (id == UI_GFX_SV) {
         /* 가로: 흰색 → 색상, 세로: 투명 → 검정 */
@@ -596,27 +596,27 @@ static void draw_gfx(int id, mu_Rect r, Color c) {
     }
 }
 
-static void draw_icon(int id, mu_Rect rect, mu_Color mc) {
+static void DrawIcon(int id, mu_Rect rect, mu_Color mc) {
     if (id >= UI_ICON_FOLDER && id < UI_ICON_END) {
-        draw_pixel_icon(id, rect, to_color(mc));
+        DrawPixelIcon(id, rect, ToColor(mc));
         return;
     }
     if (id >= UI_GFX_SV && id <= UI_GFX_SWATCH) {
-        draw_gfx(id, rect, to_color(mc));
+        DrawGfx(id, rect, ToColor(mc));
         return;
     }
     float s  = (rect.w < rect.h ? rect.w : rect.h) * 0.5f;
     float cx = rect.x + rect.w / 2.0f;
     float cy = rect.y + rect.h / 2.0f;
     float h  = s / 2.0f;
-    Color c  = to_color(mc);
+    Color c  = ToColor(mc);
 
     /* DrawTriangle은 화면 기준 반시계 방향으로 꼭짓점을 넘겨야 그려짐 */
     switch (id) {
     case MU_ICON_CLOSE:   /* 창 제목줄의 X: 도트 아이콘, 올려두면 강조색 */
         if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){ rect.x, rect.y, rect.w, rect.h }))
             c = (Color){ 255, 200, 60, 255 };
-        draw_pixel_icon(UI_ICON_CLOSE, rect, c);
+        DrawPixelIcon(UI_ICON_CLOSE, rect, c);
         break;
     case MU_ICON_CHECK:
         DrawRectangle((int)(cx - h), (int)(cy - h), (int)(h * 2), (int)(h * 2), c);
@@ -632,23 +632,23 @@ static void draw_icon(int id, mu_Rect rect, mu_Color mc) {
     }
 }
 
-void ui_render(mu_Context *ctx) {
+void UIRender(mu_Context *ctx) {
     mu_Command *cmd = NULL;
     bool clipping = false;
     while (mu_next_command(ctx, &cmd)) {
         switch (cmd->type) {
         case MU_COMMAND_RECT: {
             mu_Rect r = cmd->rect.rect;
-            DrawRectangle(r.x, r.y, r.w, r.h, to_color(cmd->rect.color));
+            DrawRectangle(r.x, r.y, r.w, r.h, ToColor(cmd->rect.color));
             break;
         }
         case MU_COMMAND_TEXT:
             DrawTextEx(GetFontDefault(), cmd->text.str,
                        (Vector2){ (float)cmd->text.pos.x, (float)cmd->text.pos.y },
-                       font_size(), (float)UI_FONT_SCALE, to_color(cmd->text.color));
+                       FontSize(), (float)UI_FONT_SCALE, ToColor(cmd->text.color));
             break;
         case MU_COMMAND_ICON:
-            draw_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color);
+            DrawIcon(cmd->icon.id, cmd->icon.rect, cmd->icon.color);
             break;
         case MU_COMMAND_CLIP: {
             mu_Rect cr = cmd->clip.rect;
@@ -662,7 +662,7 @@ void ui_render(mu_Context *ctx) {
     if (clipping) EndScissorMode();
 }
 
-void ui_input(mu_Context *ctx) {
+void UIInput(mu_Context *ctx) {
     Vector2 m = GetMousePosition();
     mu_input_mousemove(ctx, (int)m.x, (int)m.y);
 
@@ -723,24 +723,24 @@ static int g_press_x;
 static int g_clicks;         /* 연달아 누른 횟수: 2면 단어, 3이면 전체 선택 */
 static double g_click_time;
 
-static bool utf8_cont(char c) { return (c & 0xc0) == 0x80; }
+static bool UTF8Cont(char c) { return (c & 0xc0) == 0x80; }
 
-static int caret_prev(const char *buf, int i) {
+static int CaretPrev(const char *buf, int i) {
     if (i > 0) i--;
-    while (i > 0 && utf8_cont(buf[i])) i--;
+    while (i > 0 && UTF8Cont(buf[i])) i--;
     return i;
 }
 
-static int caret_next(const char *buf, int i) {
+static int CaretNext(const char *buf, int i) {
     if (buf[i]) i++;
-    while (buf[i] && utf8_cont(buf[i])) i++;
+    while (buf[i] && UTF8Cont(buf[i])) i++;
     return i;
 }
 
 /* x(글자 시작 기준 픽셀)에 가장 가까운 글자 경계 */
-static int caret_at_x(mu_Context *ctx, const char *buf, int x) {
+static int CaretAtX(mu_Context *ctx, const char *buf, int x) {
     int best = 0, best_d = x < 0 ? -x : x;
-    for (int i = caret_next(buf, 0); i > 0; i = caret_next(buf, i)) {
+    for (int i = CaretNext(buf, 0); i > 0; i = CaretNext(buf, i)) {
         int d = ctx->text_width(ctx->style->font, buf, i) - x;
         if (d < 0) d = -d;
         if (d < best_d) { best = i; best_d = d; }
@@ -750,10 +750,10 @@ static int caret_at_x(mu_Context *ctx, const char *buf, int x) {
 }
 
 /* x(글자 시작 기준 픽셀) 아래에 있는 글자의 시작. 글이 비었으면 0 */
-static int char_at_x(mu_Context *ctx, const char *buf, int x) {
+static int CharAtX(mu_Context *ctx, const char *buf, int x) {
     int i = 0;
     while (buf[i]) {
-        int next = caret_next(buf, i);
+        int next = CaretNext(buf, i);
         if (x < ctx->text_width(ctx->style->font, buf, next) || !buf[next]) break;
         i = next;
     }
@@ -761,24 +761,24 @@ static int char_at_x(mu_Context *ctx, const char *buf, int x) {
 }
 
 /* 단어 글자: 영문·숫자·_ 와 한글 같은 비ASCII. 나머지(. - 공백 등)는 구분 글자 */
-static bool word_char(char c) {
+static bool WordChar(char c) {
     return isalnum((unsigned char)c) || c == '_' || (unsigned char)c >= 0x80;
 }
 
 /* i 자리 글자가 속한 단어를 선택. 구분 글자면 그 한 글자만 */
-static void select_word(const char *buf, int i) {
+static void SelectWord(const char *buf, int i) {
     if (!buf[i]) { g_caret = g_anchor = i; return; }
-    int lo = i, hi = caret_next(buf, i);
-    if (word_char(buf[i])) {
-        while (lo > 0 && word_char(buf[lo - 1])) lo--;
-        while (buf[hi] && word_char(buf[hi])) hi++;
+    int lo = i, hi = CaretNext(buf, i);
+    if (WordChar(buf[i])) {
+        while (lo > 0 && WordChar(buf[lo - 1])) lo--;
+        while (buf[hi] && WordChar(buf[hi])) hi++;
     }
     g_anchor = lo;
     g_caret = hi;
 }
 
 /* 선택한 글자를 지우고 caret을 그 자리로. 지웠으면 true */
-static bool delete_selection(char *buf) {
+static bool DeleteSelection(char *buf) {
     int lo = mu_min(g_caret, g_anchor), hi = mu_max(g_caret, g_anchor);
     if (lo == hi) return false;
     memmove(buf + lo, buf + hi, strlen(buf + hi) + 1);
@@ -787,11 +787,11 @@ static bool delete_selection(char *buf) {
 }
 
 /* caret 자리에 글자 넣기. 칸이 모자라면 글자 단위로 자름. 넣었으면 true */
-static bool insert_text(char *buf, int bufsz, const char *text) {
+static bool InsertText(char *buf, int bufsz, const char *text) {
     int len = (int)strlen(buf), n = (int)strlen(text);
     if (n > bufsz - len - 1) {
         n = bufsz - len - 1;
-        while (n > 0 && utf8_cont(text[n])) n--;
+        while (n > 0 && UTF8Cont(text[n])) n--;
     }
     if (n <= 0) return false;
     memmove(buf + g_caret + n, buf + g_caret, (size_t)(len - g_caret + 1));
@@ -801,7 +801,7 @@ static bool insert_text(char *buf, int bufsz, const char *text) {
     return true;
 }
 
-int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
+int UITextbox(mu_Context *ctx, char *buf, int bufsz) {
     mu_Id id = mu_get_id(ctx, &buf, sizeof buf);
     mu_Rect r = mu_layout_next(ctx);
     mu_Font font = ctx->style->font;
@@ -841,10 +841,10 @@ int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
                 g_caret = len;
                 g_drag = false;
             } else if (g_clicks == 2) {
-                select_word(buf, char_at_x(ctx, buf, ctx->mouse_pos.x - org));
+                SelectWord(buf, CharAtX(ctx, buf, ctx->mouse_pos.x - org));
                 g_drag = false;
             } else if (had_focus) {
-                g_caret = caret_at_x(ctx, buf, ctx->mouse_pos.x - org);
+                g_caret = CaretAtX(ctx, buf, ctx->mouse_pos.x - org);
                 if (!shift) g_anchor = g_caret;
             }
         }
@@ -852,10 +852,10 @@ int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
             if (!(ctx->mouse_down & MU_MOUSE_LEFT)) g_drag = false;
             else {
                 if (g_drag_wait && abs(ctx->mouse_pos.x - g_press_x) > 3) {
-                    g_anchor = caret_at_x(ctx, buf, g_press_x - org);
+                    g_anchor = CaretAtX(ctx, buf, g_press_x - org);
                     g_drag_wait = false;
                 }
-                if (!g_drag_wait) g_caret = caret_at_x(ctx, buf, ctx->mouse_pos.x - org);
+                if (!g_drag_wait) g_caret = CaretAtX(ctx, buf, ctx->mouse_pos.x - org);
             }
             g_blink_from = GetTime();
         }
@@ -864,7 +864,7 @@ int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
         int dir = (ctx->key_pressed & UI_KEY_RIGHT ? 1 : 0) - (ctx->key_pressed & UI_KEY_LEFT ? 1 : 0);
         if (dir) {
             if (!shift && g_caret != g_anchor) g_caret = dir < 0 ? mu_min(g_caret, g_anchor) : mu_max(g_caret, g_anchor);
-            else g_caret = dir < 0 ? caret_prev(buf, g_caret) : caret_next(buf, g_caret);
+            else g_caret = dir < 0 ? CaretPrev(buf, g_caret) : CaretNext(buf, g_caret);
         }
         if (ctx->key_pressed & UI_KEY_HOME) g_caret = 0;
         if (ctx->key_pressed & UI_KEY_END)  g_caret = len;
@@ -880,7 +880,7 @@ int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
             char clip[1024];
             snprintf(clip, sizeof clip, "%.*s", hi - lo, buf + lo);
             SetClipboardText(clip);
-            if (IsKeyPressed(KEY_X) && delete_selection(buf)) res |= MU_RES_CHANGE;
+            if (IsKeyPressed(KEY_X) && DeleteSelection(buf)) res |= MU_RES_CHANGE;
         }
         if (ctrl && IsKeyPressed(KEY_V)) {
             const char *clip = GetClipboardText();
@@ -891,28 +891,28 @@ int ui_textbox(mu_Context *ctx, char *buf, int bufsz) {
                 line[k] = (unsigned char)clip[k] < 32 ? ' ' : clip[k];
             line[k] = '\0';
             if (line[0]) {
-                delete_selection(buf);
-                insert_text(buf, bufsz, line);
+                DeleteSelection(buf);
+                InsertText(buf, bufsz, line);
                 res |= MU_RES_CHANGE;
             }
         }
 
         /* 타이핑: 선택한 글자를 바꿔 넣음 */
         if (ctx->input_text[0]) {
-            bool del = delete_selection(buf);
-            if (insert_text(buf, bufsz, ctx->input_text) || del) res |= MU_RES_CHANGE;
+            bool del = DeleteSelection(buf);
+            if (InsertText(buf, bufsz, ctx->input_text) || del) res |= MU_RES_CHANGE;
             g_blink_from = GetTime();
         }
         /* 지우기: 선택이 있으면 선택, 없으면 caret 앞 글자 하나 */
         if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-            if (g_caret == g_anchor) g_anchor = caret_prev(buf, g_caret);
-            if (delete_selection(buf)) res |= MU_RES_CHANGE;
+            if (g_caret == g_anchor) g_anchor = CaretPrev(buf, g_caret);
+            if (DeleteSelection(buf)) res |= MU_RES_CHANGE;
             g_blink_from = GetTime();
         }
         /* Delete: 선택이 있으면 선택, 없으면 caret 뒤 글자 하나 */
         if (ctx->key_pressed & UI_KEY_DELETE) {
-            if (g_caret == g_anchor) g_anchor = caret_next(buf, g_caret);
-            if (delete_selection(buf)) res |= MU_RES_CHANGE;
+            if (g_caret == g_anchor) g_anchor = CaretNext(buf, g_caret);
+            if (DeleteSelection(buf)) res |= MU_RES_CHANGE;
             g_blink_from = GetTime();
         }
         if (ctx->key_pressed & MU_KEY_RETURN) {
@@ -960,7 +960,7 @@ static double g_tip_since;
 static bool g_tip_seen;
 
 /* 마우스가 id 위에 머물면 tip을 툴팁으로 */
-static void track_tip(mu_Context *ctx, mu_Id id, const char *tip) {
+static void TrackTip(mu_Context *ctx, mu_Id id, const char *tip) {
     if (!tip || ctx->hover != id) return;
     if (g_tip_id != id) {
         g_tip_id = id;
@@ -970,13 +970,13 @@ static void track_tip(mu_Context *ctx, mu_Id id, const char *tip) {
     g_tip_seen = true;
 }
 
-void ui_tip(mu_Context *ctx, const char *tip) {
-    track_tip(ctx, ctx->last_id, tip);
+void UITip(mu_Context *ctx, const char *tip) {
+    TrackTip(ctx, ctx->last_id, tip);
 }
 
 static mu_Color g_saved[4];
 
-void ui_push_disabled(mu_Context *ctx) {
+void UIPushDisabled(mu_Context *ctx) {
     mu_Color *c = ctx->style->colors;
     g_saved[0] = c[MU_COLOR_TEXT];
     for (int i = 0; i < 3; i++) g_saved[1 + i] = c[MU_COLOR_BUTTON + i];
@@ -984,13 +984,13 @@ void ui_push_disabled(mu_Context *ctx) {
     c[MU_COLOR_BUTTONHOVER] = c[MU_COLOR_BUTTONFOCUS] = c[MU_COLOR_BUTTON];
 }
 
-void ui_pop_disabled(mu_Context *ctx) {
+void UIPopDisabled(mu_Context *ctx) {
     mu_Color *c = ctx->style->colors;
     c[MU_COLOR_TEXT] = g_saved[0];
     for (int i = 0; i < 3; i++) c[MU_COLOR_BUTTON + i] = g_saved[1 + i];
 }
 
-bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
+bool UIIconButton(mu_Context *ctx, int icon, const char *tip, bool active) {
     /* 켜진 상태는 버튼 색을 강조색 쪽으로 바꿔서 그림 */
     mu_Color saved[3];
     if (active) {
@@ -1003,23 +1003,23 @@ bool ui_icon_button(mu_Context *ctx, int icon, const char *tip, bool active) {
     if (active)
         for (int i = 0; i < 3; i++) ctx->style->colors[MU_COLOR_BUTTON + i] = saved[i];
 
-    track_tip(ctx, ctx->last_id, tip);
+    TrackTip(ctx, ctx->last_id, tip);
     return clicked;
 }
 
-bool ui_swatch_button(mu_Context *ctx, Color c, const char *tip, bool active) {
+bool UISwatchButton(mu_Context *ctx, Color c, const char *tip, bool active) {
     mu_Id id = mu_get_id(ctx, tip, (int)strlen(tip));
     mu_Rect r = mu_layout_next(ctx);
     mu_update_control(ctx, id, r, 0);
     bool clicked = ctx->mouse_pressed == MU_MOUSE_LEFT && ctx->focus == id;
     ctx->draw_frame(ctx, r, active ? MU_COLOR_BUTTONFOCUS : ctx->hover == id ? MU_COLOR_BUTTONHOVER : MU_COLOR_BUTTON);
-    ui_swatch(ctx, mu_rect(r.x + 7, r.y + 4, r.w - 14, r.h - 8), c);
-    track_tip(ctx, id, tip);
+    UISwatch(ctx, mu_rect(r.x + 7, r.y + 4, r.w - 14, r.h - 8), c);
+    TrackTip(ctx, id, tip);
     return clicked;
 }
 
 /* 글자 버튼인데 켜진 상태를 강조색으로 보여줌 (형식/출력 고르기 등) */
-bool ui_toggle_button(mu_Context *ctx, const char *label, bool active) {
+bool UIToggleButton(mu_Context *ctx, const char *label, bool active) {
     mu_Color saved[3];
     if (active) {
         for (int i = 0; i < 3; i++) saved[i] = ctx->style->colors[MU_COLOR_BUTTON + i];
@@ -1033,35 +1033,35 @@ bool ui_toggle_button(mu_Context *ctx, const char *label, bool active) {
     return clicked;
 }
 
-void ui_tooltip_begin(void) {
+void UITooltipBegin(void) {
     g_tip_seen = false;
 }
 
-void ui_tooltip_draw(void) {
+void UITooltipDraw(void) {
     if (!g_tip_seen) { g_tip_id = 0; return; }
     if (GetTime() - g_tip_since < 0.35) return;
 
     Font f = GetFontDefault();
-    Vector2 ts = MeasureTextEx(f, g_tip, font_size(), (float)UI_FONT_SCALE);
+    Vector2 ts = MeasureTextEx(f, g_tip, FontSize(), (float)UI_FONT_SCALE);
     Vector2 m = GetMousePosition();
     float w = ts.x + 12, h = ts.y + 8;
     float x = m.x + 14, y = m.y + 22;
     /* 화면 밖으로 나가지 않게 */
     if (x + w > GetScreenWidth()) x = GetScreenWidth() - w - 2;
     if (y + h > GetScreenHeight()) y = m.y - h - 6;
-    fill_round((Rectangle){ x - PX, y - PX, w + PX * 2, h + PX * 2 }, (Color){ 255, 200, 60, 255 }, 2);
-    fill_round((Rectangle){ x, y, w, h }, (Color){ 20, 18, 28, 255 }, 1);
-    DrawTextEx(f, g_tip, (Vector2){ x + 6, y + 4 }, font_size(), (float)UI_FONT_SCALE, (Color){ 240, 236, 228, 255 });
+    FillRound((Rectangle){ x - PX, y - PX, w + PX * 2, h + PX * 2 }, (Color){ 255, 200, 60, 255 }, 2);
+    FillRound((Rectangle){ x, y, w, h }, (Color){ 20, 18, 28, 255 }, 1);
+    DrawTextEx(f, g_tip, (Vector2){ x + 6, y + 4 }, FontSize(), (float)UI_FONT_SCALE, (Color){ 240, 236, 228, 255 });
 }
 
 /* ---- raylib로 직접 그리는 버튼 (텍스처 모드 도구줄 등) ---- */
 
-bool ui_icon_button_rect(Rectangle r, int icon, const char *tip, bool active, bool blocked) {
+bool UIIconButtonRect(Rectangle r, int icon, const char *tip, bool active, bool blocked) {
     Vector2 m = GetMousePosition();
     bool hover = !blocked && CheckCollisionPointRec(m, r);
     Color bg = active ? (Color){ 120, 104, 60, 255 } : hover ? (Color){ 84, 80, 108, 255 } : (Color){ 52, 50, 68, 255 };
-    ui_fill_round(r, bg);
-    draw_pixel_icon(icon, (mu_Rect){ (int)r.x, (int)r.y, (int)r.width, (int)r.height }, (Color){ 230, 230, 230, 255 });
+    UIFillRound(r, bg);
+    DrawPixelIcon(icon, (mu_Rect){ (int)r.x, (int)r.y, (int)r.width, (int)r.height }, (Color){ 230, 230, 230, 255 });
     if (tip && hover) {
         /* microui id와 겹치지 않게 위치로 만든 id */
         mu_Id id = 0x80000000u ^ ((mu_Id)r.x << 12) ^ (mu_Id)r.y;
@@ -1075,63 +1075,63 @@ bool ui_icon_button_rect(Rectangle r, int icon, const char *tip, bool active, bo
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
-bool ui_button_rect(Rectangle r, const char *label, bool active, bool blocked) {
+bool UIButtonRect(Rectangle r, const char *label, bool active, bool blocked) {
     Vector2 m = GetMousePosition();
     bool hover = !blocked && CheckCollisionPointRec(m, r);
     Color bg = active ? (Color){ 120, 104, 60, 255 } : hover ? (Color){ 84, 80, 108, 255 } : (Color){ 52, 50, 68, 255 };
-    ui_fill_round(r, bg);
-    Vector2 ts = MeasureTextEx(GetFontDefault(), label, font_size(), (float)UI_FONT_SCALE);
+    UIFillRound(r, bg);
+    Vector2 ts = MeasureTextEx(GetFontDefault(), label, FontSize(), (float)UI_FONT_SCALE);
     DrawTextEx(GetFontDefault(), label, (Vector2){ r.x + (r.width - ts.x) / 2, r.y + (r.height - ts.y) / 2 },
-               font_size(), (float)UI_FONT_SCALE, WHITE);
+               FontSize(), (float)UI_FONT_SCALE, WHITE);
     return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 /* ---- 색 선택 ---- */
 
-static float clamp01(float v) {
+static float Clamp01(float v) {
     return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 /* 누르고 있는 동안 rect 안에서의 상대 위치(0~1). 잡고 있지 않으면 false */
-static bool drag_area(mu_Context *ctx, const char *name, mu_Rect r, float *u, float *v) {
+static bool DragArea(mu_Context *ctx, const char *name, mu_Rect r, float *u, float *v) {
     mu_Id id = mu_get_id(ctx, name, (int)strlen(name));
     mu_update_control(ctx, id, r, 0);
     if (ctx->focus != id || !(ctx->mouse_down & MU_MOUSE_LEFT)) return false;
-    *u = clamp01((float)(ctx->mouse_pos.x - r.x) / (float)(r.w - 1));
-    *v = clamp01((float)(ctx->mouse_pos.y - r.y) / (float)(r.h - 1));
+    *u = Clamp01((float)(ctx->mouse_pos.x - r.x) / (float)(r.w - 1));
+    *v = Clamp01((float)(ctx->mouse_pos.y - r.y) / (float)(r.h - 1));
     return true;
 }
 
-static void marker(mu_Context *ctx, int x, int y) {
+static void Marker(mu_Context *ctx, int x, int y) {
     mu_draw_box(ctx, mu_rect(x - 3, y - 3, 7, 7), mu_color(20, 18, 28, 255));
     mu_draw_box(ctx, mu_rect(x - 2, y - 2, 5, 5), mu_color(255, 255, 255, 255));
 }
 
-bool ui_color_picker(mu_Context *ctx, float *h, float *s, float *v, float *alpha) {
+bool UIColorPicker(mu_Context *ctx, float *h, float *s, float *v, float *alpha) {
     bool changed = false;
     float u, w;
-    Color hue = color_from_hsv(*h, 1, 1, 255);
+    Color hue = ColorFromHSVA(*h, 1, 1, 255);
 
     mu_layout_row(ctx, 2, (int[]){ 168, 22 }, 168);
     mu_Rect sv = mu_layout_next(ctx);
-    if (drag_area(ctx, "sv", sv, &u, &w)) { *s = u; *v = 1 - w; changed = true; }
+    if (DragArea(ctx, "sv", sv, &u, &w)) { *s = u; *v = 1 - w; changed = true; }
     mu_draw_icon(ctx, UI_GFX_SV, sv, mu_color(hue.r, hue.g, hue.b, 255));
-    marker(ctx, sv.x + (int)(*s * (sv.w - 1)), sv.y + (int)((1 - *v) * (sv.h - 1)));
+    Marker(ctx, sv.x + (int)(*s * (sv.w - 1)), sv.y + (int)((1 - *v) * (sv.h - 1)));
 
     mu_Rect hr = mu_layout_next(ctx);
-    if (drag_area(ctx, "hue", hr, &u, &w)) { *h = w * 359.9f; changed = true; }
+    if (DragArea(ctx, "hue", hr, &u, &w)) { *h = w * 359.9f; changed = true; }
     mu_draw_icon(ctx, UI_GFX_HUE, hr, mu_color(255, 255, 255, 255));
-    marker(ctx, hr.x + hr.w / 2, hr.y + (int)(*h / 360.0f * (hr.h - 1)));
+    Marker(ctx, hr.x + hr.w / 2, hr.y + (int)(*h / 360.0f * (hr.h - 1)));
 
-    Color full = color_from_hsv(*h, *s, *v, 255);
+    Color full = ColorFromHSVA(*h, *s, *v, 255);
     mu_layout_row(ctx, 1, (int[]){ 193 }, 16);
     mu_Rect ar = mu_layout_next(ctx);
-    if (drag_area(ctx, "alpha", ar, &u, &w)) { *alpha = u; changed = true; }
+    if (DragArea(ctx, "alpha", ar, &u, &w)) { *alpha = u; changed = true; }
     mu_draw_icon(ctx, UI_GFX_ALPHA, ar, mu_color(full.r, full.g, full.b, 255));
-    marker(ctx, ar.x + (int)(*alpha * (ar.w - 1)), ar.y + ar.h / 2);
+    Marker(ctx, ar.x + (int)(*alpha * (ar.w - 1)), ar.y + ar.h / 2);
     return changed;
 }
 
-void ui_swatch(mu_Context *ctx, mu_Rect r, Color c) {
+void UISwatch(mu_Context *ctx, mu_Rect r, Color c) {
     mu_draw_icon(ctx, UI_GFX_SWATCH, r, mu_color(c.r, c.g, c.b, c.a));
 }

@@ -13,13 +13,13 @@ static const Color ACTIVE_EDGE_COLOR = { 255, 255, 255, 200 };   /* 활성 메�
 static const Color HOVER_COLOR = { 120, 230, 255, 255 };   /* 누르면 고를 대상 */
 static const char *VIEW_NAMES[VIEW_COUNT] = { "top", "3d", "front", "side" };
 
-static int light_level(Vector3 n) {
+static int LightLevel(Vector3 n) {
     const Vector3 L = { 0.43f, 0.86f, 0.26f };
     float d = Vector3DotProduct(n, L);
     return d > 0.55f ? 0 : d > -0.1f ? 1 : 2;
 }
 
-static void draw_meshes(App *a) {
+static void DrawMeshes(App *a) {
     const Scene *s = &a->scene;
 
     BeginShaderMode(a->shader);
@@ -42,13 +42,13 @@ static void draw_meshes(App *a) {
                     for (int k = 0; k < o->nfaces; k++) {
                         const Face *f = &o->faces[k];
                         if (((f->flags & FACE_BEHIND) != 0) != behind || ((f->flags & FACE_DOUBLE) != 0) != dbl) continue;
-                        Vector3 n = obj_face_normal(o, f);
-                        int level = (a->shading && !(f->flags & FACE_NOSHADE)) ? light_level(n) : 0;
+                        Vector3 n = ObjFaceNormal(o, f);
+                        int level = (a->shading && !(f->flags & FACE_NOSHADE)) ? LightLevel(n) : 0;
                         bool textured = a->render_mode != RENDER_COLOR && !(f->flags & FACE_NOTEX);
                         if (textured != (pass == 1)) continue;
 
                         /* 텍스처 면은 흰색에 음영만 곱함 */
-                        Color c = shade_color(textured ? WHITE : f->color, level);
+                        Color c = ShadeColor(textured ? WHITE : f->color, level);
                         /* 텍스처 모드는 UV 도구일 때만 옅게, 그리기 도구는 칠한 색이 그대로 보이게 테두리만 */
                         if (f->sel && i == s->active) {
                             if (a->mode == MODE_MODEL) c = ColorLerp(c, SEL_COLOR, 0.3f);
@@ -77,58 +77,58 @@ static void draw_meshes(App *a) {
     EndShaderMode();
 }
 
-static Vector3 lift(const Viewport *vp, Vector3 p) {
+static Vector3 Lift(const Viewport *vp, Vector3 p) {
     if (vp->kind != VIEW_3D) return Vector3Add(p, Vector3Scale(Vector3Normalize(Vector3Subtract(vp->cam.position, vp->cam.target)), 1.0f));
     return Vector3Lerp(p, vp->cam.position, 0.004f);
 }
 
-static void draw_edges(const Viewport *vp, const Object *o, Color c, bool only_sel) {
+static void DrawEdges(const Viewport *vp, const Object *o, Color c, bool only_sel) {
     for (int i = 0; i < o->nfaces; i++) {
         const Face *f = &o->faces[i];
         if (only_sel && !f->sel) continue;
         for (int k = 0; k < f->n; k++)
-            DrawLine3D(lift(vp, o->verts[f->v[k]].p), lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
+            DrawLine3D(Lift(vp, o->verts[f->v[k]].p), Lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
     }
 }
 
-static void draw_face_edges(const Viewport *vp, const Object *o, const Face *f, Color c) {
+static void DrawFaceEdges(const Viewport *vp, const Object *o, const Face *f, Color c) {
     for (int k = 0; k < f->n; k++)
-        DrawLine3D(lift(vp, o->verts[f->v[k]].p), lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
+        DrawLine3D(Lift(vp, o->verts[f->v[k]].p), Lift(vp, o->verts[f->v[(k + 1) % f->n]].p), c);
 }
 
-static bool faces_camera(const Viewport *vp, const Object *o, const Face *f) {
+static bool FacesCamera(const Viewport *vp, const Object *o, const Face *f) {
     if (f->flags & FACE_DOUBLE) return true;
-    return Vector3DotProduct(obj_face_normal(o, f), Vector3Subtract(vp->cam.position, o->verts[f->v[0]].p)) > 0;
+    return Vector3DotProduct(ObjFaceNormal(o, f), Vector3Subtract(vp->cam.position, o->verts[f->v[0]].p)) > 0;
 }
 
-static bool same_point(Vector3 p, Vector3 q) {
+static bool SamePoint(Vector3 p, Vector3 q) {
     return Vector3DistanceSqr(p, q) < 1e-8f;
 }
 
 /* 윤곽선: 카메라를 향한 면의 모서리 중 맞닿은 면이 없거나 그 면이 등을 돌린 것.
    정점을 공유하지 않는 면도 있으므로 위치로 비교 */
-static void draw_outline(const Viewport *vp, const Object *o, Color c) {
+static void DrawOutline(const Viewport *vp, const Object *o, Color c) {
     for (int i = 0; i < o->nfaces; i++) {
         const Face *f = &o->faces[i];
-        if (!faces_camera(vp, o, f)) continue;
+        if (!FacesCamera(vp, o, f)) continue;
         for (int k = 0; k < f->n; k++) {
             Vector3 p = o->verts[f->v[k]].p, q = o->verts[f->v[(k + 1) % f->n]].p;
             bool inner = false;
             for (int j = 0; j < o->nfaces && !inner; j++) {
                 const Face *g = &o->faces[j];
-                if (j == i || !faces_camera(vp, o, g)) continue;
+                if (j == i || !FacesCamera(vp, o, g)) continue;
                 for (int m = 0; m < g->n && !inner; m++) {
                     Vector3 r = o->verts[g->v[m]].p, s = o->verts[g->v[(m + 1) % g->n]].p;
-                    inner = (same_point(p, s) && same_point(q, r)) || (same_point(p, r) && same_point(q, s));
+                    inner = (SamePoint(p, s) && SamePoint(q, r)) || (SamePoint(p, r) && SamePoint(q, s));
                 }
             }
-            if (!inner) DrawLine3D(lift(vp, p), lift(vp, q), c);
+            if (!inner) DrawLine3D(Lift(vp, p), Lift(vp, q), c);
         }
     }
 }
 
 /* 도트 원 테두리 (중점 원 알고리즘) */
-static void draw_pixel_ring(int cx, int cy, int r, Color c) {
+static void DrawPixelRing(int cx, int cy, int r, Color c) {
     int x = r, y = 0, err = 1 - r;
     while (x >= y) {
         int pts[8][2] = { { x, y }, { y, x }, { -y, x }, { -x, y }, { -x, -y }, { -y, -x }, { y, -x }, { x, -y } };
@@ -139,7 +139,7 @@ static void draw_pixel_ring(int cx, int cy, int r, Color c) {
     }
 }
 
-static void draw_grid(const App *a, const Viewport *vp, Color c) {
+static void DrawViewGrid(const App *a, const Viewport *vp, Color c) {
     if (vp->kind == VIEW_3D) {
         for (int i = -8; i <= 8; i++) {
             DrawLine3D((Vector3){ (float)i, 0, -8 }, (Vector3){ (float)i, 0, 8 }, i ? c : ColorAlpha(AXIS_COLOR[2], 0.6f));
@@ -149,7 +149,7 @@ static void draw_grid(const App *a, const Viewport *vp, Color c) {
     }
     /* 직교 뷰: 보이는 범위만, 그리드 4칸마다 진하게 */
     Vector3 r, u, n;
-    view_axes(vp, &r, &u, &n);
+    ViewAxes(vp, &r, &u, &n);
     float half_h = vp->zoom / 2, half_w = half_h * vp->rect.width / vp->rect.height;
     float cr = Vector3DotProduct(vp->center, r), cu = Vector3DotProduct(vp->center, u);
     float step = a->grid;
@@ -175,46 +175,46 @@ static void draw_grid(const App *a, const Viewport *vp, Color c) {
     }
 }
 
-static Color bg_color(const App *a) {
+static Color BgColor(const App *a) {
     return a->scene.bg;
 }
 
-static Color grid_color(const App *a) {
-    Color b = bg_color(a);
+static Color GridColor(const App *a) {
+    Color b = BgColor(a);
     return ColorBrightness(b, b.r + b.g + b.b > 380 ? -0.25f : 0.25f);
 }
 
-void view_draw(App *a, Viewport *vp) {
+void ViewDraw(App *a, Viewport *vp) {
     const Scene *s = &a->scene;
     const Object *act = s->active >= 0 ? &s->objs[s->active] : NULL;
     bool ortho = vp->kind != VIEW_3D;
 
     BeginTextureMode(vp->rt);
-    ClearBackground(bg_color(a));
+    ClearBackground(BgColor(a));
     BeginMode3D(vp->cam);
-    draw_grid(a, vp, grid_color(a));
-    if (a->render_mode != RENDER_WIRE) draw_meshes(a);
+    DrawViewGrid(a, vp, GridColor(a));
+    if (a->render_mode != RENDER_WIRE) DrawMeshes(a);
 
     for (int i = 0; i < s->count; i++) {
         const Object *o = &s->objs[i];
         if (o->hidden) continue;
-        if (a->render_mode == RENDER_WIRE) draw_edges(vp, o, o == act ? SEL_COLOR : WHITE, false);
-        else if (o == act && a->mode == MODE_MODEL) draw_edges(vp, o, ACTIVE_EDGE_COLOR, false);
+        if (a->render_mode == RENDER_WIRE) DrawEdges(vp, o, o == act ? SEL_COLOR : WHITE, false);
+        else if (o == act && a->mode == MODE_MODEL) DrawEdges(vp, o, ACTIVE_EDGE_COLOR, false);
         /* 텍스처 모드는 칠한 면을 가리지 않게 윤곽만 */
-        else if (o == act) draw_outline(vp, o, ACTIVE_EDGE_COLOR);
+        else if (o == act) DrawOutline(vp, o, ACTIVE_EDGE_COLOR);
     }
-    if (act) draw_edges(vp, act, SEL_COLOR, true);
+    if (act) DrawEdges(vp, act, SEL_COLOR, true);
 
     /* 누르기 전 강조: 면은 그 면의 테두리, 다른 메쉬는 메쉬 전체 테두리 */
     const Object *hov = a->hover_obj >= 0 && a->hover_obj < s->count ? &s->objs[a->hover_obj] : NULL;
-    if (hov && a->hover_face >= 0 && a->hover_face < hov->nfaces) draw_face_edges(vp, hov, &hov->faces[a->hover_face], HOVER_COLOR);
-    else if (hov && a->hover_face < 0 && a->hover_vert < 0) draw_edges(vp, hov, HOVER_COLOR, false);
+    if (hov && a->hover_face >= 0 && a->hover_face < hov->nfaces) DrawFaceEdges(vp, hov, &hov->faces[a->hover_face], HOVER_COLOR);
+    else if (hov && a->hover_face < 0 && a->hover_vert < 0) DrawEdges(vp, hov, HOVER_COLOR, false);
 
     if (act && ortho && a->mode == MODE_MODEL) {
         Vector3 r, u, n;
-        view_axes(vp, &r, &u, &n);
+        ViewAxes(vp, &r, &u, &n);
         float k = vp->zoom * 0.025f;
-        Vector3 o = lift(vp, act->origin);
+        Vector3 o = Lift(vp, act->origin);
         DrawLine3D(Vector3Subtract(o, Vector3Scale(r, k)), Vector3Add(o, Vector3Scale(r, k)), (Color){ 255, 80, 200, 255 });
         DrawLine3D(Vector3Subtract(o, Vector3Scale(u, k)), Vector3Add(o, Vector3Scale(u, k)), (Color){ 255, 80, 200, 255 });
     }
@@ -241,8 +241,8 @@ void view_draw(App *a, Viewport *vp) {
         if (ortho || Vector3DotProduct(Vector3Subtract(p, vp->cam.position), fwd) > 0) {
             sp = GetWorldToScreenEx(p, vp->cam, vp->rtw, vp->rth);
             /* 반지름은 커서의 이동 화살표보다 커서 가려지지 않게 */
-            draw_pixel_ring((int)sp.x, (int)sp.y, VERT_RING_R + 1, (Color){ 20, 20, 30, 255 });
-            draw_pixel_ring((int)sp.x, (int)sp.y, VERT_RING_R, HOVER_COLOR);
+            DrawPixelRing((int)sp.x, (int)sp.y, VERT_RING_R + 1, (Color){ 20, 20, 30, 255 });
+            DrawPixelRing((int)sp.x, (int)sp.y, VERT_RING_R, HOVER_COLOR);
         }
     }
     EndTextureMode();
