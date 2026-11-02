@@ -1,4 +1,4 @@
-"""src/icon.c의 도트 그림으로 assets/icon.ico(Windows exe 아이콘)와 docs/icon.png를 만든다.
+"""src/app/icon.c의 도트 그림으로 assets/icon.ico(Windows exe 아이콘)와 docs/icon.png를 만든다.
 
     python tools/make_icon.py
 
@@ -22,7 +22,7 @@ COLORS = {
 
 
 def read_art():
-    src = (ROOT / 'src' / 'icon.c').read_text(encoding='utf-8')
+    src = (ROOT / 'src' / 'app' / 'icon.c').read_text(encoding='utf-8')
     block = src[src.index('ICON_ART_BEGIN'):src.index('ICON_ART_END')]
     rows = re.findall(r'"([^"]*)"', block)
     assert len(rows) == 16 and all(len(r) == 16 for r in rows), 'icon art must be 16x16'

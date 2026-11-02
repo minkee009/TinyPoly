@@ -1,5 +1,5 @@
-#include "app.h"
-#include "icon.h"
+#include "app/app.h"
+#include "app/icon.h"
 #include <stdio.h>
 
 /* 창이 화면보다 크면 macOS가 몰래 줄이는데 raylib은 이를 몰라서 위쪽이 잘린다.
