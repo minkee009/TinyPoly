@@ -77,6 +77,16 @@ void ui_fill_round(Rectangle r, Color c) {
     fill_round(r, c, 2);
 }
 
+void ui_checker(Rectangle r, int block) {
+    for (int y = 0; y < (int)r.height; y += block)
+        for (int x = 0; x < (int)r.width; x += block) {
+            int w = (int)r.width - x < block ? (int)r.width - x : block;
+            int h = (int)r.height - y < block ? (int)r.height - y : block;
+            DrawRectangle((int)r.x + x, (int)r.y + y, w, h,
+                          ((x + y) / block) & 1 ? (Color){ 150, 150, 160, 255 } : (Color){ 210, 210, 216, 255 });
+        }
+}
+
 /* ---- 제목줄 닫기(X)와 크기 조절 손잡이가 있는 창 ---- */
 
 static bool g_resizable;   /* 창은 겹쳐 열지 않으므로 하나면 충분 */

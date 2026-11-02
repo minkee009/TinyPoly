@@ -72,6 +72,8 @@ Vector3 obj_face_center(const Object *o, const Face *f);
 void    obj_translate(Object *o, Vector3 d);
 void    obj_project_uv(Object *o, Face *f, float uv_scale);   /* 법선 주축 방향 평면 투영 */
 void    obj_clear_selection(Object *o);
+int     obj_count_selected(const Object *o, bool faces);   /* 골라진 면(faces) 또는 정점 개수 */
+Face   *obj_first_selected_face(Object *o);                /* 없으면 NULL */
 
 void obj_remove_unused_verts(Object *o);
 void obj_delete_selected_faces(Object *o);

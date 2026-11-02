@@ -1,4 +1,5 @@
-#include "app.h"
+#include "icon.h"
+#include <raylib.h>
 
 /* 앱 아이콘: 도트 아이소메트릭 큐브 (16x16).
    tools/make_icon.py가 이 그림을 읽어 Windows exe 아이콘(assets/icon.ico)을 만든다.

@@ -50,6 +50,8 @@ void ui_tooltip_draw(void);
 
 /* 모서리를 도트 계단으로 깎은 사각형 (raylib로 바로 그림) */
 void ui_fill_round(Rectangle r, Color c);
+/* 투명 부분을 보여주는 체크무늬 (block: 칸 크기, 픽셀) */
+void ui_checker(Rectangle r, int block);
 /* 제목줄 오른쪽에 X가 있는 창 (MU_OPT_NOCLOSE 없이). X를 누르면 다음 프레임에 false + *closed = true.
    크기 조절이 되는 창은 오른쪽 아래에 손잡이 점을 그림. 끝은 ui_end_window로 */
 bool ui_begin_window(mu_Context *ctx, const char *title, mu_Rect rect, int opt, bool *closed);

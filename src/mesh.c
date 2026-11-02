@@ -101,6 +101,19 @@ void obj_clear_selection(Object *o) {
     for (int i = 0; i < o->nfaces; i++) o->faces[i].sel = false;
 }
 
+int obj_count_selected(const Object *o, bool faces) {
+    int n = 0;
+    if (faces) for (int i = 0; i < o->nfaces; i++) n += o->faces[i].sel;
+    else       for (int i = 0; i < o->nverts; i++) n += o->verts[i].sel;
+    return n;
+}
+
+Face *obj_first_selected_face(Object *o) {
+    for (int i = 0; i < o->nfaces; i++)
+        if (o->faces[i].sel) return &o->faces[i];
+    return NULL;
+}
+
 void obj_remove_unused_verts(Object *o) {
     int *remap = calloc((size_t)o->nverts + 1, sizeof(int));
     for (int i = 0; i < o->nfaces; i++)

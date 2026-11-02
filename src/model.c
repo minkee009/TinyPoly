@@ -1,18 +1,11 @@
-#include "app.h"
+#include "model.h"
+#include "cursor.h"
+#include "model_ops.h"
+#include "view.h"
+#include "view_pick.h"
 #include <raymath.h>
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-typedef enum { D_NONE, D_VERTS, D_MESH, D_BOX, D_CLICK3D, D_ORBIT, D_PAN, D_RMB } DragKind;
-
-static DragKind g_drag;
-static int g_view;              /* 드래그를 시작한 뷰 */
-static Vector2 g_press;
-static bool g_moved, g_marked, g_box_add;
-static Vector3 *g_orig;         /* 드래그 시작 시 활성 메쉬 정점 위치 */
-static Vector3 g_orig_origin;
 
 static bool key_shift(void) { return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT); }
 static bool key_ctrl(void)  { return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL); }
@@ -25,50 +18,38 @@ static float snapf(float v, float g) {
     return roundf(v / g) * g;
 }
 
-static int count_sel_verts(const Object *o) {
-    int n = 0;
-    for (int i = 0; i < o->nverts; i++) n += o->verts[i].sel;
-    return n;
-}
-
-static int count_sel_faces(const Object *o) {
-    int n = 0;
-    for (int i = 0; i < o->nfaces; i++) n += o->faces[i].sel;
-    return n;
-}
-
 /* ---- 드래그 변형 ---- */
 
-static void begin_edit_drag(App *a, DragKind kind) {
+static void begin_edit_drag(App *a, ModelDragKind kind) {
     Object *o = app_active(a);
-    free(g_orig);
-    g_orig = malloc(sizeof(Vector3) * (size_t)(o->nverts + 1));
-    for (int i = 0; i < o->nverts; i++) g_orig[i] = o->verts[i].p;
-    g_orig_origin = o->origin;
-    g_drag = kind;
-    g_marked = false;
+    free(a->model.orig);
+    a->model.orig = malloc(sizeof(Vector3) * (size_t)(o->nverts + 1));
+    for (int i = 0; i < o->nverts; i++) a->model.orig[i] = o->verts[i].p;
+    a->model.orig_origin = o->origin;
+    a->model.drag = kind;
+    a->model.marked = false;
 }
 
-static void restore(Object *o) {
-    for (int i = 0; i < o->nverts; i++) o->verts[i].p = g_orig[i];
-    o->origin = g_orig_origin;
+static void restore(App *a, Object *o) {
+    for (int i = 0; i < o->nverts; i++) o->verts[i].p = a->model.orig[i];
+    o->origin = a->model.orig_origin;
 }
 
 /* 매 프레임 시작 위치에서 다시 계산: R(회전)/T(크기)/Shift(중심점)는 드래그 중 바꿔 눌러도 됨 */
 static void apply_edit_drag(App *a, const Viewport *vp, Vector2 m) {
     Object *o = app_active(a);
     if (!o) return;
-    float dx = m.x - g_press.x, dy = m.y - g_press.y;
-    if (!g_moved) return;
+    float dx = m.x - a->model.press.x, dy = m.y - a->model.press.y;
+    if (!a->model.moved) return;
 
-    restore(o);
-    if (!g_marked) { app_mark(a); g_marked = true; }
+    restore(a, o);
+    if (!a->model.marked) { app_mark(a); a->model.marked = true; }
 
     Vector3 r, u, n;
     view_axes(vp, &r, &u, &n);
     float upp = view_units_per_pixel(a, vp);
     bool snap = snapping(a);
-    bool only_sel = g_drag == D_VERTS;
+    bool only_sel = a->model.drag == MDRAG_VERTS;
 
     /* 기준점: 메쉬 전체면 원점, 정점 일부면 그 중심 */
     Vector3 pivot = o->origin;
@@ -100,7 +81,7 @@ static void apply_edit_drag(App *a, const Viewport *vp, Vector2 m) {
     } else {
         Vector3 d = Vector3Add(Vector3Scale(r, dx * upp), Vector3Scale(u, -dy * upp));
         if (snap) d = (Vector3){ snapf(d.x, a->grid), snapf(d.y, a->grid), snapf(d.z, a->grid) };
-        if (g_drag == D_MESH && key_shift()) {
+        if (a->model.drag == MDRAG_MESH && key_shift()) {
             o->origin = Vector3Add(o->origin, d);
         } else {
             for (int i = 0; i < o->nverts; i++)
@@ -155,7 +136,7 @@ static void click_3d(App *a, const Viewport *vp, Vector2 m) {
         }
         for (int i = 0; i < o->nverts; i++) o->verts[i].sel = false;
         obj_select_face_verts(o);
-    } else if (o && (count_sel_faces(o) || count_sel_verts(o))) {
+    } else if (o && (obj_count_selected(o, true) || obj_count_selected(o, false))) {
         obj_clear_selection(o);
     } else {
         app_select_mesh(a, -1);
@@ -168,7 +149,7 @@ static void open_context_menu(App *a, const Viewport *vp, Vector2 m) {
     int vi = vp->kind == VIEW_3D ? pick_vert_3d(a, vp, m) : view_pick_vert(a, vp, m);
     int oi, fi;
     /* 3D 뷰는 직접 고른 정점일 때만 (면을 고르면 꼭짓점도 같이 골라지므로 면이 골라져 있으면 면 메뉴) */
-    bool vert_menu = vp->kind != VIEW_3D || (o && vi >= 0 && o->verts[vi].sel && count_sel_faces(o) == 0);
+    bool vert_menu = vp->kind != VIEW_3D || (o && vi >= 0 && o->verts[vi].sel && obj_count_selected(o, true) == 0);
     if (o && vi >= 0 && a->mode == MODE_MODEL && vert_menu) {
         if (!o->verts[vi].sel) {
             obj_clear_selection(o);
@@ -228,7 +209,7 @@ static void update_mouse(App *a, bool input_ok) {
     Vector2 md = GetMouseDelta();
     int hv = view_at(a, m);
 
-    if (g_drag == D_NONE && hv >= 0 && input_ok) {
+    if (a->model.drag == MDRAG_NONE && hv >= 0 && input_ok) {
         Viewport *vp = &a->views[hv];
         float wheel = GetMouseWheelMove();
         if (wheel != 0) {
@@ -236,19 +217,19 @@ static void update_mouse(App *a, bool input_ok) {
             else vp->zoom = Clamp(vp->zoom * powf(0.88f, wheel), 0.5f, 100.0f);
         }
 
-        g_press = m;
-        g_moved = false;
-        g_view = hv;
+        a->model.press = m;
+        a->model.moved = false;
+        a->model.view = hv;
         Object *o = app_active(a);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
-            g_drag = D_PAN;
+            a->model.drag = MDRAG_PAN;
         } else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            g_drag = D_RMB;
+            a->model.drag = MDRAG_RMB;
         } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (hv == VIEW_3D) {
-                g_drag = key_ctrl() ? D_BOX : D_CLICK3D;
-                g_box_add = key_shift();
+                a->model.drag = key_ctrl() ? MDRAG_BOX : MDRAG_CLICK3D;
+                a->model.box_add = key_shift();
             } else {
                 int vi = view_pick_vert(a, vp, m);
                 int oi, fi;
@@ -259,69 +240,69 @@ static void update_mouse(App *a, bool input_ok) {
                     } else {
                         if (!key_shift() && !v->sel) obj_clear_selection(o);
                         v->sel = true;
-                        begin_edit_drag(a, D_VERTS);
+                        begin_edit_drag(a, MDRAG_VERTS);
                     }
                 } else if (view_pick_face(a, vp, m, -1, &oi, &fi)) {
                     if (oi != a->scene.active) app_select_mesh(a, oi);
-                    begin_edit_drag(a, D_MESH);
+                    begin_edit_drag(a, MDRAG_MESH);
                 } else {
-                    g_drag = D_BOX;
-                    g_box_add = key_shift();
+                    a->model.drag = MDRAG_BOX;
+                    a->model.box_add = key_shift();
                 }
             }
         }
     }
-    if (g_drag == D_NONE) return;
+    if (a->model.drag == MDRAG_NONE) return;
 
-    Viewport *vp = &a->views[g_view];
-    if (Vector2Distance(m, g_press) > 3.0f) g_moved = true;
+    Viewport *vp = &a->views[a->model.view];
+    if (Vector2Distance(m, a->model.press) > 3.0f) a->model.moved = true;
 
-    switch (g_drag) {
-    case D_VERTS:
-    case D_MESH:
+    switch (a->model.drag) {
+    case MDRAG_VERTS:
+    case MDRAG_MESH:
         apply_edit_drag(a, vp, m);
-        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) g_drag = D_NONE;
+        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) a->model.drag = MDRAG_NONE;
         break;
-    case D_BOX:
-        if (g_moved)
-            g_box = (Rectangle){ fminf(m.x, g_press.x), fminf(m.y, g_press.y),
-                                 fabsf(m.x - g_press.x), fabsf(m.y - g_press.y) };
+    case MDRAG_BOX:
+        if (a->model.moved)
+            a->model.box = (Rectangle){ fminf(m.x, a->model.press.x), fminf(m.y, a->model.press.y),
+                                 fabsf(m.x - a->model.press.x), fabsf(m.y - a->model.press.y) };
         if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Object *o = app_active(a);
-            if (g_moved) {
-                box_select(a, vp, g_box, g_box_add);
-            } else if (o && (count_sel_verts(o) || count_sel_faces(o))) {
+            if (a->model.moved) {
+                box_select(a, vp, a->model.box, a->model.box_add);
+            } else if (o && (obj_count_selected(o, false) || obj_count_selected(o, true))) {
                 obj_clear_selection(o);
             } else {
                 app_select_mesh(a, -1);
             }
-            g_box.width = 0;
-            g_drag = D_NONE;
+            a->model.box.width = 0;
+            a->model.drag = MDRAG_NONE;
         }
         break;
-    case D_CLICK3D:
-        if (g_moved) g_drag = D_ORBIT;
+    case MDRAG_CLICK3D:
+        if (a->model.moved) a->model.drag = MDRAG_ORBIT;
         else if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             click_3d(a, vp, m);
-            g_drag = D_NONE;
+            a->model.drag = MDRAG_NONE;
         }
         break;
-    case D_ORBIT:
+    case MDRAG_ORBIT:
         a->yaw -= md.x * 0.01f;
         a->pitch = Clamp(a->pitch + md.y * 0.01f, -1.55f, 1.55f);
-        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) g_drag = D_NONE;
+        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) a->model.drag = MDRAG_NONE;
         break;
-    case D_PAN:
+    case MDRAG_PAN:
         pan_view(a, vp, md);
-        if (!IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) && !IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) g_drag = D_NONE;
+        if (!IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) && !IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) a->model.drag = MDRAG_NONE;
         break;
-    case D_RMB:
-        if (g_moved) {
+    case MDRAG_RMB:
+        if (a->model.moved) {
             /* 우클릭 드래그: 3D는 회전, 직교 뷰는 이동 */
-            g_drag = g_view == VIEW_3D ? D_ORBIT : D_PAN;
+            a->model.drag = a->model.view == VIEW_3D ? MDRAG_ORBIT : MDRAG_PAN;
         } else if (!IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             open_context_menu(a, vp, m);
-            g_drag = D_NONE;
+            a->model.drag = MDRAG_NONE;
         }
         break;
     default:
@@ -332,10 +313,9 @@ static void update_mouse(App *a, bool input_ok) {
 /* ---- 키보드 ---- */
 
 static Viewport *key_view(App *a) {
-    static int last = VIEW_FRONT;
     int hv = view_at(a, GetMousePosition());
-    if (hv >= 0) last = hv;
-    return &a->views[last];
+    if (hv >= 0) a->model.key_view = hv;
+    return &a->views[a->model.key_view];
 }
 
 static bool pressed(int key) {
@@ -370,7 +350,7 @@ static void arrow_move(App *a) {
         return;
     }
     app_mark(a);
-    if (count_sel_verts(o)) {
+    if (obj_count_selected(o, false)) {
         for (int i = 0; i < o->nverts; i++)
             if (o->verts[i].sel) o->verts[i].p = Vector3Add(o->verts[i].p, d);
     } else {
@@ -396,7 +376,7 @@ static void update_keys(App *a) {
     if (IsKeyPressed(KEY_E)) model_extrude(a);
     if (IsKeyPressed(KEY_X)) model_delete_faces(a);
     if (IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) model_delete_verts(a);
-    if (IsKeyPressed(KEY_F) && o && count_sel_faces(o)) app_open_menu(a, MENU_FACEPROPS);
+    if (IsKeyPressed(KEY_F) && o && obj_count_selected(o, true)) app_open_menu(a, MENU_FACEPROPS);
     if (IsKeyPressed(KEY_G) && o) app_open_menu(a, MENU_MESHPROPS);
     if (IsKeyPressed(KEY_M)) a->render_mode = (a->render_mode + 1) % RENDER_COUNT;
     if (IsKeyPressed(KEY_L)) a->shading = !a->shading;
@@ -406,7 +386,7 @@ static void update_keys(App *a) {
 /* update_mouse의 좌클릭 판정과 같은 순서로, 누르기 전에 강조할 대상을 정한다 */
 static void update_hover(App *a, bool input_ok) {
     a->hover_obj = a->hover_face = a->hover_vert = -1;
-    if (!input_ok || g_drag != D_NONE || a->menu != MENU_NONE) return;
+    if (!input_ok || a->model.drag != MDRAG_NONE || a->menu != MENU_NONE) return;
     Vector2 m = GetMousePosition();
     int hv = view_at(a, m);
     if (hv < 0) return;
@@ -438,7 +418,7 @@ void model_update(App *a, bool input_ok, bool keys) {
     if (a->scene.active >= a->scene.count) a->scene.active = -1;
     update_mouse(a, input_ok && !a->ui_hover);
     update_hover(a, input_ok && !a->ui_hover);
-    if (keys && input_ok && g_drag == D_NONE) update_keys(a);
+    if (keys && input_ok && a->model.drag == MDRAG_NONE) update_keys(a);
 }
 
 /* R/T를 누르고 있으면 그 동작, 아니면 이동 */
@@ -447,12 +427,12 @@ static int edit_cursor(void) {
 }
 
 int model_cursor(App *a) {
-    switch (g_drag) {
-    case D_VERTS:
-    case D_MESH:  return edit_cursor();
-    case D_BOX:   return CURSOR_CROSS;
-    case D_ORBIT: return CURSOR_ROTATE;
-    case D_PAN:   return CURSOR_GRAB;
+    switch (a->model.drag) {
+    case MDRAG_VERTS:
+    case MDRAG_MESH:  return edit_cursor();
+    case MDRAG_BOX:   return CURSOR_CROSS;
+    case MDRAG_ORBIT: return CURSOR_ROTATE;
+    case MDRAG_PAN:   return CURSOR_GRAB;
     default: break;
     }
 
@@ -464,119 +444,4 @@ int model_cursor(App *a) {
     int oi, fi;
     if (view_pick_vert(a, vp, m) >= 0 || view_pick_face(a, vp, m, -1, &oi, &fi)) return edit_cursor();
     return CURSOR_ARROW;
-}
-
-/* ---- 명령 ---- */
-
-void model_add_prim(App *a, int kind) {
-    Scene *s = &a->scene;
-    if (s->count >= MAX_OBJECTS) { app_msg(a, "too many meshes"); return; }
-    app_mark(a);
-    char name[32];
-    snprintf(name, sizeof name, "%s%d", PRIM_NAMES[kind], s->count + 1);
-    Object *o = scene_add(s, name);
-    /* 투명한 색으로 만들면 안 보이므로 그땐 흰색 */
-    prim_build(o, kind, a->color.a ? a->color : WHITE, a->add_up, a->add_at, a->scene.tex);
-    app_select_mesh(a, s->count - 1);
-}
-
-void model_extrude(App *a) {
-    Object *o = app_active(a);
-    if (!o || !count_sel_faces(o)) { app_msg(a, "extrude: select faces in the 3d view"); return; }
-    app_mark(a);
-    obj_extrude_selected_faces(o, a->grid, scene_uv_scale(&a->scene));
-}
-
-void model_delete_faces(App *a) {
-    Object *o = app_active(a);
-    if (!o || !count_sel_faces(o)) return;
-    app_mark(a);
-    obj_delete_selected_faces(o);
-    obj_clear_selection(o);
-}
-
-void model_delete_verts(App *a) {
-    Object *o = app_active(a);
-    if (!o || !count_sel_verts(o)) return;
-    app_mark(a);
-    obj_delete_selected_verts(o);
-    obj_clear_selection(o);
-}
-
-void model_delete_mesh(App *a) {
-    if (a->scene.active < 0) return;
-    char name[sizeof a->scene.objs[0].name];
-    snprintf(name, sizeof name, "%s", a->scene.objs[a->scene.active].name);
-    app_mark(a);
-    scene_delete(&a->scene, a->scene.active);
-    app_msg(a, "deleted %s (ctrl+z to undo)", name);
-}
-
-void model_merge(App *a) {
-    Object *o = app_active(a);
-    if (!o || count_sel_verts(o) < 2) { app_msg(a, "merge: select 2+ vertices"); return; }
-    app_mark(a);
-    obj_merge_selected_verts(o);
-}
-
-void model_snap(App *a) {
-    Object *o = app_active(a);
-    if (!o || !count_sel_verts(o)) return;
-    app_mark(a);
-    obj_snap_selected_verts(o, a->grid);
-}
-
-void model_mirror(App *a, int axis) {
-    Object *o = app_active(a);
-    if (!o) return;
-    app_mark(a);
-    obj_mirror(o, axis);
-}
-
-void model_clone(App *a) {
-    Scene *s = &a->scene;
-    if (s->active < 0 || s->count >= MAX_OBJECTS) return;
-    app_mark(a);
-    Object *o = &s->objs[s->count];
-    obj_copy(o, &s->objs[s->active]);
-    obj_clear_selection(o);
-    s->count++;
-    app_select_mesh(a, s->count - 1);
-    app_msg(a, "cloned %s", o->name);
-}
-
-void model_copy(App *a) {
-    Object *o = app_active(a);
-    if (!o) return;
-    if (a->has_clipboard) obj_free(&a->clipboard);
-    obj_copy(&a->clipboard, o);
-    obj_clear_selection(&a->clipboard);
-    a->has_clipboard = true;
-    app_msg(a, "copied %s", o->name);
-}
-
-void model_paste(App *a) {
-    Scene *s = &a->scene;
-    if (!a->has_clipboard || s->count >= MAX_OBJECTS) return;
-    app_mark(a);
-    Object *o = &s->objs[s->count++];
-    obj_copy(o, &a->clipboard);
-    obj_translate(o, (Vector3){ a->grid * 2, 0, a->grid * 2 });
-    app_select_mesh(a, s->count - 1);
-}
-
-void model_set_face_flag(App *a, int flag, bool on) {
-    Object *o = app_active(a);
-    if (!o) return;
-    app_mark(a);
-    for (int i = 0; i < o->nfaces; i++)
-        if (o->faces[i].sel) o->faces[i].flags = on ? (o->faces[i].flags | flag) : (o->faces[i].flags & ~flag);
-}
-
-void model_set_face_color(App *a, Color color) {
-    Object *o = app_active(a);
-    if (!o) return;
-    app_mark(a);
-    for (int i = 0; i < o->nfaces; i++)
-        if (o->faces[i].sel) o->faces[i].color = color;
 }

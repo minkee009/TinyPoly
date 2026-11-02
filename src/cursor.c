@@ -1,4 +1,6 @@
-#include "app.h"
+#include "cursor.h"
+#include "model.h"
+#include "paint.h"
 #include "ui.h"
 
 /* 도트 커서. X: 테두리, W: 채움, A: 강조색(노랑), C: 상황에 따른 색(현재 색 등), 공백: 투명 */

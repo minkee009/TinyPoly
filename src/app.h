@@ -4,6 +4,7 @@
 #include <raylib.h>
 #include <microui/microui.h>
 #include "mesh.h"
+#include "state.h"
 
 #define TOPBAR_H 30
 #define VERT_RING_R 6              /* 정점 강조 원 반지름 (뷰 도트 단위). 3D 뷰는 이 안을 누르면 정점 선택 */
@@ -55,6 +56,10 @@ typedef struct {
     int pal_scroll;            /* 팔레트 줄이 넘칠 때 첫 줄 */
     Rectangle canvas_rect;
 
+    /* 모드별 조작 상태 (state.h) */
+    ModelState model;
+    PaintState paint;
+
     /* 메뉴/창 */
     MenuKind menu;
     bool open_menu;            /* 이번 프레임에 팝업을 연다 */
@@ -97,60 +102,10 @@ Object *app_active(App *a);
 void app_select_mesh(App *a, int i);
 void app_open_menu(App *a, MenuKind m);
 
-/* view.c */
-void view_init(App *a);
-void view_layout(App *a);
-void view_update_cameras(App *a);
-void view_upload_texture(App *a);
-void view_tex_dirty(App *a, int x0, int y0, int x1, int y1);   /* 텍스처 일부만 바뀜 (텍셀, 양끝 포함) */
-void view_draw(App *a, Viewport *vp);
-int  view_at(const App *a, Vector2 m);
-Ray  view_ray(const Viewport *vp, Vector2 m);
-bool view_project(const Viewport *vp, Vector3 p, Vector2 *out);
-void view_axes(const Viewport *vp, Vector3 *right, Vector3 *up, Vector3 *normal);
-float view_units_per_pixel(const App *a, const Viewport *vp);
-bool view_pick_face(App *a, const Viewport *vp, Vector2 m, int only, int *oi, int *fi);
-int  view_pick_vert(App *a, const Viewport *vp, Vector2 m);
-int  view_pick_vert_3d(App *a, const Viewport *vp, Vector2 m);   /* 강조 원 안의 보이는 정점 */
-extern Rectangle g_box;        /* 박스 선택 표시 (w == 0이면 없음) */
-
-/* model.c */
-void model_update(App *a, bool input_ok, bool keys);   /* keys: 모델 단축키까지 처리 */
-void model_add_prim(App *a, int kind);
-void model_extrude(App *a);
-void model_delete_faces(App *a);
-void model_delete_verts(App *a);
-void model_delete_mesh(App *a);
-void model_merge(App *a);
-void model_snap(App *a);
-void model_mirror(App *a, int axis);
-void model_clone(App *a);
-void model_copy(App *a);
-void model_paste(App *a);
-void model_set_face_flag(App *a, int flag, bool on);
-void model_set_face_color(App *a, Color color);
-
-/* paint.c */
-void paint_update(App *a, bool input_ok);
-void paint_draw(App *a);
-void paint_reset_selection(void);       /* 텍스처 크기가 바뀌면 선택 해제 */
-int  paint_cursor(App *a);              /* 캔버스 위에서 보여줄 커서, 해당 없으면 -1 */
-bool paint_hover_texel(const App *a, Color *out);   /* 커서 아래 텍셀 색, 캔버스 밖이면 false */
-
-/* cursor.c: OS 커서 대신 그리는 도트 커서 (맨 마지막에 그림) */
-enum {
-    CURSOR_ARROW, CURSOR_CROSS, CURSOR_PEN, CURSOR_PICKER, CURSOR_BUCKET,
-    CURSOR_MOVE, CURSOR_HAND, CURSOR_GRAB, CURSOR_ROTATE, CURSOR_SCALE, CURSOR_COUNT
-};
-void cursor_draw(App *a);
-
-/* icon.c: 창 아이콘 (도트 큐브) */
-void app_set_icon(void);
-int  model_cursor(App *a);              /* 뷰포트 위 상황에 맞는 커서 (model.c) */
-void uv_rotate(App *a);
-void uv_flip(App *a, bool vertical);
-void uv_reset(App *a);
-void uv_copy(App *a);
-void uv_paste(App *a);
+/* 수명: 창을 연 뒤 init, 매 프레임 update → draw, 창을 닫은 뒤 shutdown */
+void app_init(App *a);
+void app_update(App *a);       /* 입력 처리 + UI 만들기 */
+void app_draw(App *a);
+void app_shutdown(App *a);
 
 #endif
