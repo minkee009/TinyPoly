@@ -384,8 +384,66 @@ static void build_shape(Object *o, int kind, Color color) {
     orient_outward(o);
 }
 
+/* 원통·원뿔·구의 옆면(앞쪽 면들)을 이음매 하나로 이어진 UV 한 덩어리로 펼친다.
+   회전 전 기본 좌표 기준이고, 펼친 면 수를 돌려준다. 덩어리는 (0,0)부터 시작 */
+static int unwrap_sides(Object *o, int kind, float scale) {
+    const float r = 0.5f;
+    const int segs = 8, rings = 6;
+    float sw = roundf(2.0f * PI * r * scale / (float)segs);   /* 한 칸 너비 */
+    int n;
+    switch (kind) {
+    case PRIM_CYLINDER: n = segs; break;
+    case PRIM_CONE:     n = segs; break;
+    case PRIM_SPHERE:   n = segs * rings; break;
+    default: return 0;
+    }
+    float slant = roundf(sqrtf(r * r + 1.0f) * scale);         /* 원뿔 옆면 길이 */
+    float rh = roundf(PI * r * scale / (float)rings);          /* 구 한 줄 높이 */
+    float umin = 1e9f, vmin = 1e9f;
+    for (int i = 0; i < n; i++) {
+        Face *f = &o->faces[i];
+        int col = kind == PRIM_SPHERE ? i / rings : i;
+        for (int k = 0; k < f->n; k++) {
+            int v = f->v[k];
+            Vector2 uv;
+            if (kind == PRIM_CYLINDER) {
+                int c = v % segs;
+                if (c < col) c += segs;                        /* 이음매 넘어가는 칸 */
+                uv = (Vector2){ (float)(segs - c) * sw, v >= segs ? 0 : roundf(scale) };
+            } else if (kind == PRIM_CONE) {
+                if (v == segs)                                 /* 꼭짓점은 칸 가운데 */
+                    uv = (Vector2){ ((float)(segs - col) - 0.5f) * sw, 0 };
+                else {
+                    int c = v < col ? v + segs : v;
+                    uv = (Vector2){ (float)(segs - c) * sw, slant };
+                }
+            } else {
+                int last = 1 + (rings - 1) * segs;
+                if (v == 0 || v == last)                       /* 극점은 칸 가운데 */
+                    uv = (Vector2){ ((float)(segs - col) - 0.5f) * sw, v ? (float)rings * rh : 0 };
+                else {
+                    int c = (v - 1) % segs;
+                    if (c < col) c += segs;
+                    uv = (Vector2){ (float)(segs - c) * sw, (float)(1 + (v - 1) / segs) * rh };
+                }
+            }
+            f->uv[k] = uv;
+            umin = fminf(umin, uv.x);
+            vmin = fminf(vmin, uv.y);
+        }
+    }
+    for (int i = 0; i < n; i++)
+        for (int k = 0; k < o->faces[i].n; k++) {
+            Vector2 *uv = &o->faces[i].uv[k];
+            *uv = (Vector2){ roundf(uv->x - umin), roundf(uv->y - vmin) };
+        }
+    return n;
+}
+
 void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const TexBuf *tex) {
     build_shape(o, kind, color);
+    float scale = tex->w / 8.0f;
+    int nwrap = unwrap_sides(o, kind, scale);
 
     up = Vector3Normalize(up);
     Vector3 axis = Vector3CrossProduct((Vector3){ 0, 1, 0 }, up);
@@ -399,19 +457,25 @@ void prim_build(Object *o, int kind, Color color, Vector3 up, Vector3 at, const 
     }
     o->origin = at;
 
-    /* 면마다 투영한 UV를 텍스처 위에 줄지어 배치(선반 방식)해서 겹치지 않게 */
-    float scale = tex->w / 8.0f;
+    /* 펼친 옆면 덩어리와 나머지 면(면마다 평면 투영)을 텍스처 위에 줄지어 배치(선반 방식)해서 겹치지 않게 */
     float x = 0, y = 0, row = 0;
-    for (int i = 0; i < o->nfaces; i++) {
-        Face *f = &o->faces[i];
-        obj_project_uv(o, f, scale);
+    for (int i = 0; i < o->nfaces;) {
+        int end = i < nwrap ? nwrap : i + 1;
+        if (i >= nwrap) obj_project_uv(o, &o->faces[i], scale);
         float w = 0, h = 0;
-        for (int k = 0; k < f->n; k++) { w = fmaxf(w, f->uv[k].x); h = fmaxf(h, f->uv[k].y); }
+        for (int j = i; j < end; j++)
+            for (int k = 0; k < o->faces[j].n; k++) {
+                w = fmaxf(w, o->faces[j].uv[k].x);
+                h = fmaxf(h, o->faces[j].uv[k].y);
+            }
         if (x + w > tex->w) { x = 0; y += row; row = 0; }
         if (y + h > tex->h) y = 0;
-        for (int k = 0; k < f->n; k++) f->uv[k] = (Vector2){ f->uv[k].x + x, f->uv[k].y + y };
+        for (int j = i; j < end; j++)
+            for (int k = 0; k < o->faces[j].n; k++)
+                o->faces[j].uv[k] = (Vector2){ o->faces[j].uv[k].x + x, o->faces[j].uv[k].y + y };
         x += w;
         row = fmaxf(row, h);
+        i = end;
     }
 }
 
