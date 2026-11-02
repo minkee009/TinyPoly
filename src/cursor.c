@@ -174,17 +174,22 @@ static void draw_art(const CursorArt *art, Vector2 m, Color dyn) {
             }
 }
 
-/* macOS는 커서 위에 창이 생기면 enter 이벤트를 안 보내서 IsCursorOnScreen()이 계속 false다.
-   첫 enter 전까지는 마우스가 움직인 뒤 창 안에 있는지로 대신 판단한다 */
+/* macOS는 커서 위에 창이 생기거나 창이 커서 아래로 커지면(타이틀바 더블클릭) enter 이벤트를
+   안 보내서 IsCursorOnScreen()이 false로 남는다. 그동안 OS 커서는 이미 숨겨져 있으니,
+   마우스가 창 안에서 움직이면 창 안에 있다고 대신 판단한다 */
 static bool cursor_visible(void) {
-    static bool entered, moved;
-    if (IsCursorOnScreen()) entered = true;
-    if (entered) return IsCursorOnScreen();
-    Vector2 d = GetMouseDelta();
-    if (d.x != 0 || d.y != 0) moved = true;
-    Vector2 m = GetMousePosition();
-    return moved && IsWindowFocused() &&
-           m.x >= 0 && m.y >= 0 && m.x < GetScreenWidth() && m.y < GetScreenHeight();
+    static bool was_on, stray;
+    bool on = IsCursorOnScreen();
+    if (on != was_on) {             /* 진짜 enter/leave가 오면 그쪽을 따른다 */
+        was_on = on;
+        stray = false;
+        return on;
+    }
+    if (on) return true;
+    Vector2 d = GetMouseDelta(), m = GetMousePosition();
+    if (m.x < 0 || m.y < 0 || m.x >= GetScreenWidth() || m.y >= GetScreenHeight()) stray = false;
+    else if (d.x != 0 || d.y != 0) stray = IsWindowFocused();
+    return stray;
 }
 
 void cursor_draw(App *a) {
