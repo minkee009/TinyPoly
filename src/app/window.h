@@ -8,6 +8,6 @@
 bool WindowOpen(void);
 
 /* 창 아이콘 (도트 큐브) (icon.c) */
-void AppSetIcon(void);
+void WindowSetIcon(void);
 
 #endif

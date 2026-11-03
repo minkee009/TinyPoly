@@ -39,7 +39,7 @@ static Color IconColor(char ch) {
     }
 }
 
-void AppSetIcon(void) {
+void WindowSetIcon(void) {
     /* 32x32로 키워서 창 아이콘에 (macOS는 창 아이콘이 없어서 무시됨) */
     const int s = 2;
     Image img = GenImageColor(16 * s, 16 * s, BLANK);

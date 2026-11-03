@@ -28,7 +28,7 @@ bool WindowOpen(void) {
         return false;
     }
     SetWindowMinSize(800, 500);
-    AppSetIcon();
+    WindowSetIcon();
     FitWindowToMonitor();
     SetExitKey(KEY_NULL);
     HideCursor();                   /* 창 안에서는 도트 커서를 직접 그림 (cursor.c) */
